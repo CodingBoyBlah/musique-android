@@ -28,7 +28,11 @@ object MusiqueColors {
 
     /** Translucent fill for secondary buttons over artwork (transport prev/next, shuffle). */
     val fillOnArtwork = Color.White.copy(alpha = 0.14f)
+    val fillOnArtworkPressed = Color.White.copy(alpha = 0.22f)
     val trackInactive = Color.White.copy(alpha = 0.25f)
+    val grabber = Color.White.copy(alpha = 0.42f)
+    val pillSelected = Color.White
+    val onPillSelected = Color(0xFF1C1714)
 
     /** Apple Music / Cider rose, used when there is no artwork to take color from. */
     val accent = Color(0xFFFA2F48)
@@ -66,6 +70,14 @@ object MusiqueDimens {
     val roundButton = 40.dp
     val minTouchTarget = 44.dp
     val rowHeight = 56.dp
+    val playerHorizontalPadding = 24.dp
+    val transportHeight = 82.dp
+    val playerDrawerHeight = 64.dp
+    val lyricsCompactArtSize = 48.dp
+    val queueRowHeight = 64.dp
+    val queueArtSize = 48.dp
+    val grabberWidth = 36.dp
+    val grabberHeight = 4.dp
 
     /** Height occupied by the floating tab bar plus its bottom gap above the gesture inset. */
     val tabBarTotalHeight = navBarBottomGap + navBarHeight

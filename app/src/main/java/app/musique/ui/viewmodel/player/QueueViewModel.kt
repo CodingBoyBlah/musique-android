@@ -12,6 +12,8 @@ import app.musique.data.queue.SavedQueue
 import app.musique.data.repository.SavedQueueRepository
 import app.musique.data.repository.SettingsRepository
 import app.musique.playback.PlaybackStateHolder
+import app.musique.playback.model.PlaybackOwner
+import app.musique.playback.model.RepeatMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,7 +22,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -70,12 +76,39 @@ class QueueViewModel @Inject constructor(
             initialValue = false
         )
 
-    val isShuffling: StateFlow<Boolean> = settingsRepository.shuffleEnabled
+    val isShuffling: StateFlow<Boolean> = playbackStateHolder.state
+        .map { it.shuffleEnabled }
+        .distinctUntilChanged()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = false
         )
+
+    val repeatMode: StateFlow<RepeatMode> = playbackStateHolder.state
+        .map { it.repeatMode }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = RepeatMode.NONE
+        )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val playbackContextLabel: StateFlow<PlaybackContextLabel?> = combine(
+        settingsRepository.lastContextUri.distinctUntilChanged(),
+        playbackStateHolder.state.map { it.currentAudio to it.owner }.distinctUntilChanged(),
+    ) { contextUri, (audio, owner) ->
+        Triple(contextUri, audio, owner)
+    }.flatMapLatest { (contextUri, audio, owner) ->
+        flow {
+            emit(resolvePlaybackContextLabel(contextUri, audio, owner == PlaybackOwner.REMOTE, metadata))
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = null
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val likedTrackIds: StateFlow<Set<String>> =
@@ -110,13 +143,36 @@ class QueueViewModel @Inject constructor(
     private var nextLoadJob: Job? = null
 
     fun toggleShuffle() {
-        val newValue = !isShuffling.value
-
         viewModelScope.launch {
+            if (!playbackStateHolder.localPlaybackAllowed) return@launch
+            val newValue = !isShuffling.value
             settingsRepository.setShuffle(newValue)
             spirc.shuffle(newValue)
             loadQueue(currentAudio.value)
         }
+    }
+
+    fun toggleRepeat() {
+        viewModelScope.launch {
+            if (!playbackStateHolder.localPlaybackAllowed) return@launch
+            val current = settingsRepository.repeatMode.first()
+            val next = current.next()
+            settingsRepository.setRepeat(next.repeat)
+            settingsRepository.setRepeatTrack(next.repeatTrack)
+            spirc.repeat(next.repeat, next.repeatTrack)
+        }
+    }
+
+    fun clearManualQueue() {
+        val state = _queueState.value
+        val activeUri = currentAudio.value?.uri
+        val actualCurrentIdx = activeUri?.let { uri -> state.tracks.indexOfFirst { it.audio.uri == uri } } ?: -1
+        val kept = state.tracks.filterIndexed { index, entry ->
+            (actualCurrentIdx >= 0 && index <= actualCurrentIdx) || !entry.isQueue
+        }
+        unloadedNextTail = unloadedNextTail.filterNot { it.isQueue }
+        setQueueEntries(kept, if (actualCurrentIdx >= 0) actualCurrentIdx else 0)
+        debouncedSaveToRepository(kept)
     }
 
     val currentTrackEntry: QueueEntry?
