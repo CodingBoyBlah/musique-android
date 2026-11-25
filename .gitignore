@@ -1,0 +1,39 @@
+# IDE
+.idea/
+*.iml
+.DS_Store
+workspace.json
+
+# Gradle
+.gradle/
+**/build/
+
+# Android
+/captures
+.externalNativeBuild
+.cxx
+*.so
+
+# Local config
+local.properties
+keystore.properties
+
+# Rust
+rust/**/target/
+
+# AI / agent files: never commit
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+**/CLAUDE.md
+**/AGENTS.md
+**/GEMINI.md
+.claude/
+.gemini/
+.ai/
+.cursor/
+.cursorrules
+.sumi/
+task_plan.md
+findings.md
+progress.md

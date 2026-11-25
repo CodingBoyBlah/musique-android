@@ -1,0 +1,527 @@
+package cc.tomko.outify.services
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.ServiceInfo
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Binder
+import android.util.Log
+import android.widget.Toast
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.C.AUDIO_CONTENT_TYPE_MUSIC
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player.REPEAT_MODE_ALL
+import androidx.media3.common.Player.REPEAT_MODE_OFF
+import androidx.media3.common.Player.REPEAT_MODE_ONE
+import androidx.media3.common.Player.STATE_IDLE
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.CommandButton
+import androidx.media3.session.DefaultMediaNotificationProvider
+import androidx.media3.session.MediaBrowser
+import androidx.media3.session.MediaController
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionToken
+import cc.tomko.outify.MainActivity
+import cc.tomko.outify.MediaSessionConstants
+import cc.tomko.outify.R
+import cc.tomko.outify.core.SpClient
+import cc.tomko.outify.core.model.SpotifyUri
+import cc.tomko.outify.core.spirc.SpircWrapper
+import cc.tomko.outify.data.dao.LikedDao
+import cc.tomko.outify.data.metadata.TrackMetadataHelper
+import cc.tomko.outify.data.repository.LikedRepository
+import cc.tomko.outify.data.repository.SettingsRepository
+import cc.tomko.outify.playback.PlaybackStateHolder
+import cc.tomko.outify.playback.Player
+import cc.tomko.outify.playback.model.RepeatMode
+import cc.tomko.outify.utils.CoilBitmapLoader
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
+import dagger.hilt.android.AndroidEntryPoint
+import jakarta.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import javax.inject.Singleton
+
+
+@UnstableApi
+@Singleton
+@AndroidEntryPoint
+class PlaybackService : MediaLibraryService(),
+    androidx.media3.common.Player.Listener,
+    AudioManager.OnAudioFocusChangeListener {
+    companion object {
+        const val ROOT = "root"
+        const val TRACK = "track"
+        const val ALBUM = "album"
+        const val PLAYLIST = "playlist"
+        const val SEARCH = "search"
+        const val LIKED = "liked"
+        const val RECENT = "recent"
+
+        const val NOTIFICATION_ID = 4894
+        const val CHANNEL_ID = "outify_channel_01"
+
+        const val EXTRA_REQUIRE_FOREGROUND = "cc.tomko.outify.REQUIRE_FOREGROUND"
+        private const val PLACEHOLDER_NOTIFICATION_ID = NOTIFICATION_ID + 1
+
+        val TAG = PlaybackService::class.simpleName.toString()
+
+        val AUDIO_ATTRIBUTES: AudioAttributes = AudioAttributes.Builder().apply {
+            setUsage(C.USAGE_MEDIA)
+            setContentType(AUDIO_CONTENT_TYPE_MUSIC)
+        }.build()
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.media_playback_channel),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(R.string.media_playback_channel_desc)
+            setShowBadge(false)
+        }
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    private val offloadScope = CoroutineScope(Dispatchers.IO)
+
+    @Inject
+    lateinit var player: Player
+
+    @Inject
+    lateinit var trackDatabase: TrackMetadataHelper
+
+    @Inject
+    lateinit var settings: SettingsRepository
+
+    @Inject
+    lateinit var mediaLibrarySessionCallback: MediaLibrarySessionCallback
+
+    @Inject
+    lateinit var playbackStateHolder: PlaybackStateHolder
+
+    @Inject
+    lateinit var spirc: SpircWrapper
+
+    @Inject
+    lateinit var spClient: SpClient
+
+    @Inject
+    lateinit var likedDao: LikedDao
+
+    @Inject
+    lateinit var likedRepository: LikedRepository
+
+    private lateinit var audioManager: AudioManager
+    private var hasAudioFocus = false
+    private var mediaLibrarySession: MediaLibrarySession? = null
+    private var selfBrowserFuture: ListenableFuture<MediaBrowser>? = null
+    private val binder = MusicBinder()
+    private val shuffleMutex = Mutex()
+    private var shuffleEnabled = false
+    private var notificationUpdateJob: Job? = null
+
+    private val becomingNoisyListener = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != AudioManager.ACTION_AUDIO_BECOMING_NOISY) return
+            if (playbackStateHolder.localPlaybackAllowed && player.playWhenReady) player.pause()
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val result = super.onStartCommand(intent, flags, startId)
+        if (intent?.getBooleanExtra(EXTRA_REQUIRE_FOREGROUND, false) == true) {
+            satisfyForegroundStart()
+        }
+        return result
+    }
+
+    private fun satisfyForegroundStart() {
+        val session = mediaLibrarySession
+        if (session != null && isPlaybackOngoing) {
+            onUpdateNotification(session, true)
+            return
+        }
+        try {
+            val placeholder = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle(getString(R.string.app_name))
+                .setSilent(true)
+                .build()
+            ServiceCompat.startForeground(
+                this,
+                PLACEHOLDER_NOTIFICATION_ID,
+                placeholder,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
+            )
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to satisfy foreground service start", e)
+        }
+    }
+
+    override fun onGetSession(controller: MediaSession.ControllerInfo): MediaLibrarySession? {
+        return mediaLibrarySession
+    }
+
+    override fun onCreate() {
+        androidx.media3.common.util.Log.setLogLevel(androidx.media3.common.util.Log.LOG_LEVEL_ALL)
+        Log.i(TAG, "Starting PlaybackService")
+        super.onCreate()
+
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this)
+                .setChannelId(CHANNEL_ID)
+                .setChannelName(R.string.app_name)
+                .setNotificationId(NOTIFICATION_ID)
+                .build()
+                .apply {
+                    setSmallIcon(R.drawable.ic_launcher_foreground)
+                }
+        )
+
+        Log.i(TAG, "Creating audio focus manager")
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+
+        player.setAudioAttributes(AUDIO_ATTRIBUTES, true)
+
+        createNotificationChannel()
+
+        mediaLibrarySessionCallback.apply {
+            service = this@PlaybackService
+            toggleLike = ::toggleLike
+            toggleStartRadio = ::toggleStartRadio
+            toggleRepeatMode = ::toggleRepeatMode
+            toggleShuffle = ::toggleShuffle
+        }
+
+        mediaLibrarySession = MediaLibrarySession.Builder(this, player, mediaLibrarySessionCallback)
+            .setSessionActivity(
+                PendingIntent.getActivity(
+                    this,
+                    0,
+                    Intent(this, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+            .setBitmapLoader(
+                CoilBitmapLoader(
+                    scope,
+                    context = this,
+                )
+            )
+            .build()
+
+        val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
+        val browserFuture = MediaBrowser.Builder(this, sessionToken).buildAsync()
+        selfBrowserFuture = browserFuture
+        browserFuture.addListener({ browserFuture.get() }, MoreExecutors.directExecutor())
+
+        // Player acquires focus only for local output, never for a remote media session.
+
+        scope.launch {
+            combine(
+                playbackStateHolder.state.map { Triple(it.currentAudio, it.repeatMode, it.shuffleEnabled) }.distinctUntilChanged(),
+                settings.shuffleEnabled.distinctUntilChanged(),
+            ) { playback, shuffle -> playback to shuffle }
+                .collect { (playback, shuffle) ->
+                    shuffleEnabled = if (playbackStateHolder.localPlaybackAllowed) shuffle else playback.third
+                    updateNotification()
+                }
+        }
+
+        registerReceiver(
+            becomingNoisyListener,
+            IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+        )
+    }
+
+    private fun toggleLike() {
+        val item = player.currentMediaItem ?: return
+        val id = item.mediaId
+        val audio = playbackStateHolder.state.value.currentAudio ?: return
+        Log.i(TAG, "Toggling like for $id")
+
+        scope.launch {
+            val isTrack = audio.isTrack()
+            val uri = if (isTrack) "spotify:track:$id" else "spotify:episode:$id"
+
+            val wasLiked = if (isTrack) {
+                likedRepository.isLiked(id)
+            } else {
+                likedRepository.isLikedEpisode(id)
+            }
+
+            if (isTrack) {
+                if (wasLiked) likedRepository.removeLiked(id) else likedRepository.addLiked(id)
+            } else {
+                if (wasLiked) likedRepository.removeLikedEpisode(id) else likedRepository.addLikedEpisode(
+                    id
+                )
+            }
+            updateNotification()
+
+            val success = try {
+                withContext(Dispatchers.IO) {
+                    if (wasLiked) spClient.deleteItems(arrayOf(uri)) else spClient.saveItems(arrayOf(uri))
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "spClient failed to ${if (wasLiked) "delete" else "save"} $uri", e)
+                false
+            }
+
+            if (!success) {
+                Log.w(TAG, "Rolling back like state for $uri")
+                if (isTrack) {
+                    if (wasLiked) likedRepository.addLiked(id) else likedRepository.removeLiked(id)
+                } else {
+                    if (wasLiked) likedRepository.addLikedEpisode(id) else likedRepository.removeLikedEpisode(
+                        id
+                    )
+                }
+                updateNotification()
+            }
+        }
+    }
+
+    private fun toggleStartRadio() {
+        val item = player.currentMediaItem ?: return
+        val id = item.mediaId
+        Log.i(TAG, "Starting radio for $id")
+
+        scope.launch {
+            spirc.startRadio(SpotifyUri.Track(id), false)
+        }
+    }
+
+    private fun toggleRepeatMode() {
+        if (!playbackStateHolder.localPlaybackAllowed) return
+        val state = playbackStateHolder.state.value
+        val repeatMode = state.repeatMode.next()
+
+        player.repeatMode = repeatMode.toMediaRepeatMode()
+
+        scope.launch {
+            settings.setRepeatMode(repeatMode.repeat, repeatMode.repeatTrack)
+            playbackStateHolder.setRepeatMode(repeatMode)
+            spirc.repeat(repeatMode.repeat, repeatMode.repeatTrack)
+        }
+    }
+
+    private fun toggleShuffle() {
+        if (!playbackStateHolder.localPlaybackAllowed) return
+        scope.launch {
+            // Read after the preceding toggle was saved, so rapid taps alternate
+            // instead of both applying the same stale notification snapshot.
+            shuffleMutex.withLock {
+                val enabled = !settings.shuffleEnabled.first()
+                settings.setShuffle(enabled)
+                spirc.shuffle(enabled)
+            }
+        }
+    }
+
+    fun updateNotification() {
+        val session = mediaLibrarySession ?: return
+        val state = playbackStateHolder.state.value
+        val audio = state.currentAudio
+        val hasAudio = audio != null
+
+        val repeatMode = state.repeatMode
+        val shuffle = shuffleEnabled
+
+        notificationUpdateJob?.cancel()
+        notificationUpdateJob = scope.launch {
+            val isLiked = hasAudio && if (audio.isTrack()) {
+                likedDao.containsTrack(audio.id)
+            } else {
+                likedDao.containsEpisode(audio.id)
+            }
+            val buttons = listOf(
+                shuffleNotificationButton(
+                    enabled = shuffle,
+                    hasAudio = hasAudio && playbackStateHolder.localPlaybackAllowed,
+                    displayName = getString(if (shuffle) R.string.shuffle_turn_off else R.string.shuffle_turn_on),
+                ),
+                CommandButton.Builder(
+                    when (isLiked) {
+                        true -> CommandButton.ICON_HEART_FILLED
+                        false -> CommandButton.ICON_HEART_UNFILLED
+                    }
+                )
+                    .setDisplayName(getString(R.string.like))
+                    .setSessionCommand(MediaSessionConstants.CommandToggleLike)
+                    .setEnabled(hasAudio && audio.isTrack())
+                    .build(),
+                CommandButton.Builder(CommandButton.ICON_RADIO)
+                    .setDisplayName(getString(R.string.start_radio))
+                    .setSessionCommand(MediaSessionConstants.CommandToggleStartRadio)
+                    .setEnabled(hasAudio && audio.isTrack())
+                    .build(),
+                CommandButton.Builder(
+                    when (repeatMode) {
+                        RepeatMode.NONE -> CommandButton.ICON_REPEAT_OFF
+                        RepeatMode.ONE -> CommandButton.ICON_REPEAT_ONE
+                        RepeatMode.ALL -> CommandButton.ICON_REPEAT_ALL
+                    }
+                )
+                    .setDisplayName(
+                        getString(
+                            when (player.repeatMode) {
+                                REPEAT_MODE_OFF -> R.string.repeat_mode_off
+                                REPEAT_MODE_ONE -> R.string.repeat_mode_one
+                                REPEAT_MODE_ALL -> R.string.repeat_mode_all
+                                else -> {
+                                    Log.w(
+                                        TAG,
+                                        "Unknown repeat mode for display name: ${player.repeatMode}"
+                                    )
+                                    R.string.repeat_mode_off
+                                }
+                            }
+                        )
+                    )
+                    .setSessionCommand(MediaSessionConstants.CommandToggleRepeatMode)
+                    .setEnabled(hasAudio && playbackStateHolder.localPlaybackAllowed)
+                    .build(),
+            )
+            session.setMediaButtonPreferences(buttons)
+            Log.i(TAG, "Updated notification with ${buttons.size} buttons, isLiked=$isLiked")
+        }
+    }
+
+    override fun onPlayerError(error: PlaybackException) {
+        super.onPlayerError(error)
+
+        Toast.makeText(
+            this@PlaybackService,
+            getString(R.string.player_playback_error, error.message, error.errorCode, error.cause?.message ?: ""),
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    override fun onPlaybackStateChanged(@androidx.media3.common.Player.State playbackState: Int) {
+        if (playbackState == STATE_IDLE) {
+            Log.i(TAG, "Playback idling")
+        }
+    }
+
+    override fun onRepeatModeChanged(repeatMode: Int) {
+        updateNotification()
+        if (!playbackStateHolder.localPlaybackAllowed) return
+        offloadScope.launch {
+            settings.setRepeat(repeatMode != REPEAT_MODE_OFF)
+        }
+    }
+
+    override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+        if (!playbackStateHolder.localPlaybackAllowed) return
+        player.shuffleModeEnabled = shuffleModeEnabled
+    }
+
+    override fun onDestroy() {
+        Log.i(TAG, "Terminating PlaybackService")
+
+        // Disconnect the self browser before the session it is bound to goes away.
+        selfBrowserFuture?.let { MediaController.releaseFuture(it) }
+        selfBrowserFuture = null
+
+        mediaLibrarySession?.run {
+            if (playbackStateHolder.localPlaybackAllowed) player.stop()
+            player.release()
+            release()
+            mediaLibrarySession = null
+        }
+        scope.cancel()
+        offloadScope.cancel()
+        unregisterReceiver(becomingNoisyListener)
+        abandonAudioFocus()
+
+        super.onDestroy()
+
+        Log.i(TAG, "Terminated PlaybackService")
+    }
+
+    override fun onBind(intent: Intent?) = super.onBind(intent) ?: binder
+    override fun onAudioFocusChange(focusChange: Int) {
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                hasAudioFocus = true
+                Log.i(TAG, "Resuming playback")
+//                resumePlayback()
+            }
+
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                hasAudioFocus = false
+                Log.i(TAG, "Stopping playback")
+//                stopPlayback()
+            }
+
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                hasAudioFocus = false
+                Log.i(TAG, "Pausing playback")
+//                pausePlayback()
+            }
+
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                Log.i(TAG, "Ducking playback")
+//                mediaPlayer?.setVolume(0.2f, 0.2f)
+            }
+        }
+    }
+
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    private fun requestAudioFocus(): Boolean {
+        audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                android.media.AudioAttributes.Builder()
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .build()
+            )
+            .build()
+
+        val result = audioManager.requestAudioFocus(audioFocusRequest!!)
+        hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        return hasAudioFocus
+    }
+
+    private fun abandonAudioFocus() {
+        audioFocusRequest?.let {
+            audioManager.abandonAudioFocusRequest(it)
+        }
+        hasAudioFocus = false
+    }
+
+    inner class MusicBinder : Binder() {
+        val service: PlaybackService
+            get() = this@PlaybackService
+    }
+}
