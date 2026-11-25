@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -29,6 +30,7 @@ import androidx.navigation3.ui.NavDisplay
 import app.musique.reccobeats.PendingRecommendation
 import app.musique.ui.GlobalPopupController
 import app.musique.ui.PopupSpec
+import app.musique.ui.theme.MusiqueMotion
 import app.musique.ui.screens.HomeScreen
 import app.musique.ui.screens.SearchScreen
 import app.musique.ui.screens.library.LibraryScreen
@@ -93,8 +95,10 @@ fun SharedTransitionScope.NavigationRoot(
         transitionSpec = { directionalSlide(defaultForward = true) },
         popTransitionSpec = { directionalSlide(defaultForward = false) },
         predictivePopTransitionSpec = {
-            slideInHorizontally { -it } + fadeIn() togetherWith
-                    slideOutHorizontally { it } + fadeOut()
+            slideInHorizontally(animationSpec = MusiqueMotion.layout()) { -it } +
+                fadeIn(animationSpec = tween(180)) togetherWith
+                slideOutHorizontally(animationSpec = MusiqueMotion.layout()) { it } +
+                fadeOut(animationSpec = tween(140))
         },
         entryProvider = entryProvider {
             entry<Route.HomeScreen>(metadata = navRank(0)) {
@@ -109,7 +113,7 @@ fun SharedTransitionScope.NavigationRoot(
                 )
             }
 
-            entry<Route.LikedScreen>(metadata = navRank(2)) {
+            entry<Route.LikedScreen>(metadata = navRank(3)) {
                 val viewModel: LikedViewModel = hiltViewModel()
                 val listState = rememberLazyListState()
 
@@ -129,7 +133,7 @@ fun SharedTransitionScope.NavigationRoot(
                 )
             }
 
-            entry<Route.LibraryScreen>(metadata = navRank(3)) {
+            entry<Route.LibraryScreen>(metadata = navRank(1)) {
                 val viewModel: LibraryViewModel = hiltViewModel()
 
                 LibraryScreen(viewModel, backStack)
@@ -382,11 +386,15 @@ fun SharedTransitionScope.NavigationRoot(
 
 private fun horizontalSlide(forward: Boolean): ContentTransform =
     if (forward) {
-        slideInHorizontally { it } + fadeIn() togetherWith
-                slideOutHorizontally { -it } + fadeOut()
+        slideInHorizontally(animationSpec = MusiqueMotion.layout()) { it } +
+            fadeIn(animationSpec = tween(180)) togetherWith
+            slideOutHorizontally(animationSpec = MusiqueMotion.layout()) { -it } +
+            fadeOut(animationSpec = tween(140))
     } else {
-        slideInHorizontally { -it } + fadeIn() togetherWith
-                slideOutHorizontally { it } + fadeOut()
+        slideInHorizontally(animationSpec = MusiqueMotion.layout()) { -it } +
+            fadeIn(animationSpec = tween(180)) togetherWith
+            slideOutHorizontally(animationSpec = MusiqueMotion.layout()) { it } +
+            fadeOut(animationSpec = tween(140))
     }
 
 private fun AnimatedContentTransitionScope<Scene<NavKey>>.directionalSlide(

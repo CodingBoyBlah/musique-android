@@ -16,6 +16,7 @@ object MusiqueColors {
     val cardRaised = Color(0xFF1C1C1E)
     /** Floating chrome: tab bar capsule, round buttons over artwork. */
     val chrome = Color(0xFF232323)
+    val chromeFloating = Color(0xF0232323)
     val chromeTranslucent = Color(0xD9232323)
     val hairline = Color.White.copy(alpha = 0.08f)
     val glassEdge = Color.White.copy(alpha = 0.08f)
@@ -35,6 +36,7 @@ object MusiqueColors {
 
 object MusiqueShapes {
     val miniPlayer = RoundedCornerShape(22.dp)
+    val miniPlayerPlayButton = RoundedCornerShape(14.dp)
     val navCapsule = RoundedCornerShape(30.dp)
     val navActivePill = RoundedCornerShape(22.dp)
     val card = RoundedCornerShape(14.dp)
@@ -65,9 +67,20 @@ object MusiqueDimens {
     val minTouchTarget = 44.dp
     val rowHeight = 56.dp
 
+    /** Height occupied by the floating tab bar plus its bottom gap above the gesture inset. */
+    val tabBarTotalHeight = navBarBottomGap + navBarHeight
+    /** Bottom inset of the collapsed mini player above the gesture inset. */
+    val miniPlayerBottomInset = tabBarTotalHeight + miniPlayerGap
+    /** Total bottom footprint when the mini player is visible above the tab bar. */
+    val miniPlayerTotalHeight = miniPlayerBottomInset + miniPlayerHeight
+    val fabBottomWithMiniPlayer = miniPlayerTotalHeight + 12.dp
+    val fabBottomWithoutMiniPlayer = tabBarTotalHeight + 12.dp
+    val sheetCornerDragRadius = 28.dp
+    val sheetDismissThreshold = 120.dp
+
     /**
      * Bottom content padding a scrolling tab page needs so its last item clears the floating
      * mini player and tab bar (add the navigation bar inset on top of this).
      */
-    val floatingChromeHeight = navBarBottomGap + navBarHeight + miniPlayerGap + miniPlayerHeight + 16.dp
+    val floatingChromeHeight = miniPlayerTotalHeight + 16.dp
 }

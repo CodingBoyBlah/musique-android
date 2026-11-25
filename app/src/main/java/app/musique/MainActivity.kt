@@ -36,14 +36,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Podcasts
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -64,6 +71,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -91,15 +99,15 @@ import app.musique.core.model.CoverSize
 import app.musique.core.model.getCover
 import app.musique.ui.MusiqueTheme
 import app.musique.ui.theme.LocalNowPlayingPalette
+import app.musique.ui.theme.MusiqueDimens
 import app.musique.ui.theme.rememberArtworkPalette
 import app.musique.ui.PopupSpec
 import app.musique.ui.ThemeMode
 import app.musique.ui.components.GlobalPopupHost
-import app.musique.ui.components.navigation.FloatingOutifyBottomNav
+import app.musique.ui.components.navigation.MusiqueTabBar
 import app.musique.ui.components.navigation.NavDestination
 import app.musique.ui.components.navigation.NavigationRoot
 import app.musique.ui.components.navigation.currentOr
-import app.musique.ui.components.navigation.OutifyBottomNav
 import app.musique.ui.components.navigation.Route
 import app.musique.ui.components.player.MiniPlayer
 import app.musique.ui.components.player.PlayerSheet
@@ -224,30 +232,28 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        val homeLabel = stringResource(R.string.nav_home)
+        val libraryLabel = stringResource(R.string.nav_library)
+        val searchLabel = stringResource(R.string.nav_search)
         val routes = listOf(
-            NavDestination("home", "Home", Route.HomeScreen) {
+            NavDestination("home", homeLabel, Route.HomeScreen) { selected ->
                 Icon(
-                    Icons.Default.Home,
+                    if (selected) Icons.Filled.Home else Icons.Outlined.Home,
                     contentDescription = null
                 )
             },
-            NavDestination("search", "Search", Route.SearchScreen) {
+            NavDestination("library", libraryLabel, Route.LibraryScreen) { selected ->
                 Icon(
-                    Icons.Default.Search,
+                    if (selected) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic,
                     contentDescription = null
                 )
             },
-            NavDestination("liked", "Liked", Route.LikedScreen()) {
+            NavDestination("search", searchLabel, Route.SearchScreen) { selected ->
                 Icon(
-                    Icons.Default.Favorite,
+                    if (selected) Icons.Filled.Search else Icons.Outlined.Search,
                     contentDescription = null
                 )
             },
-            NavDestination(
-                "library",
-                "Library",
-                Route.LibraryScreen
-            ) { Icon(Icons.Default.LibraryMusic, contentDescription = null) },
         )
 
         val currentRoute = backStack.currentOr(startRoute)
@@ -258,9 +264,8 @@ class MainActivity : ComponentActivity() {
 
         val selectedId = when (currentRoute) {
             Route.HomeScreen -> "home"
-            Route.SearchScreen -> "search"
-            is Route.LikedScreen -> "liked"
-            Route.LibraryScreen -> "library"
+            Route.LibraryScreen, is Route.LikedScreen -> "library"
+            Route.SearchScreen, Route.RecommendationsScreen -> "search"
             is Route.ArtistScreen -> "detail_artist"
             is Route.AlbumScreen, is Route.TrackScreen -> "detail_album"
             is Route.PlaylistScreen -> "detail_playlist"
@@ -311,29 +316,37 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val detailDestination = remember(lastDetailRoute) {
+        val detailLabel = when (lastDetailRoute) {
+            is Route.ArtistScreen -> stringResource(R.string.nav_detail_artist)
+            is Route.AlbumScreen, is Route.TrackScreen -> stringResource(R.string.nav_detail_album)
+            is Route.PlaylistScreen -> stringResource(R.string.nav_detail_playlist)
+            is Route.ProfileScreen -> stringResource(R.string.nav_detail_profile)
+            is Route.ShowScreen -> stringResource(R.string.nav_detail_show)
+            else -> null
+        }
+
+        val detailDestination = remember(lastDetailRoute, detailLabel) {
             lastDetailRoute?.let { route ->
-                val (id, label, icon) = when (route) {
-                    is Route.ArtistScreen -> Triple("detail_artist", "Artist", Icons.Default.Person)
+                val label = detailLabel ?: return@let null
+                val (id, icons) = when (route) {
+                    is Route.ArtistScreen -> "detail_artist" to (Icons.Outlined.Person to Icons.Filled.Person)
                     is Route.AlbumScreen,
-                    is Route.TrackScreen -> Triple("detail_album", "Album", Icons.Default.Album)
+                    is Route.TrackScreen -> "detail_album" to (Icons.Outlined.Album to Icons.Filled.Album)
 
-                    is Route.PlaylistScreen -> Triple(
-                        "detail_playlist",
-                        "Playlist",
-                        Icons.AutoMirrored.Filled.QueueMusic
-                    )
+                    is Route.PlaylistScreen -> "detail_playlist" to (
+                        Icons.AutoMirrored.Outlined.QueueMusic to Icons.AutoMirrored.Filled.QueueMusic
+                        )
 
-                    is Route.ProfileScreen -> Triple(
-                        "detail_profile",
-                        "Profile",
-                        Icons.Default.AccountCircle
-                    )
+                    is Route.ProfileScreen -> "detail_profile" to (
+                        Icons.Outlined.AccountCircle to Icons.Filled.AccountCircle
+                        )
 
-                    is Route.ShowScreen -> Triple("detail_show", "Show", Icons.Default.Podcasts)
+                    is Route.ShowScreen -> "detail_show" to (Icons.Outlined.Podcasts to Icons.Filled.Podcasts)
                     else -> return@let null
                 }
-                NavDestination(id, label, route) { Icon(icon, contentDescription = null) }
+                NavDestination(id, label, route) { selected ->
+                    Icon(if (selected) icons.second else icons.first, contentDescription = null)
+                }
             }
         }
 
@@ -509,7 +522,7 @@ class MainActivity : ComponentActivity() {
                                                         backStack = backStack,
                                                         entryViewModelStoreProvider = entryViewModelStoreProvider,
                                                         modifier = Modifier.fillMaxSize(),
-                                                        bottomPadding = if (interfaceSettings.experimentalFloatingNav) 60.dp else 56.dp
+                                                        bottomPadding = MusiqueDimens.tabBarTotalHeight
                                                     )
 
                                                     InAppNotificationHost(
@@ -518,30 +531,17 @@ class MainActivity : ComponentActivity() {
                                                         hostPaddingBottom = notificationPaddingBottom
                                                     )
 
-                                                    if (interfaceSettings.experimentalFloatingNav) {
-                                                        FloatingOutifyBottomNav(
-                                                            items = allRoutes,
-                                                            selectedId = selectedId,
-                                                            onItemSelected = { item ->
-                                                                if (backStack.last() != item.route) backStack.add(
-                                                                    item.route
-                                                                )
-                                                            },
-                                                            showSelectedLabel = interfaceSettings.navbarShowLabel,
-                                                            modifier = Modifier.align(Alignment.BottomCenter)
-                                                        )
-                                                    } else {
-                                                        OutifyBottomNav(
-                                                            items = allRoutes,
-                                                            selectedId = selectedId,
-                                                            onItemSelected = { item ->
-                                                                if (backStack.last() != item.route) backStack.add(
-                                                                    item.route
-                                                                )
-                                                            },
-                                                            modifier = Modifier.align(Alignment.BottomCenter)
-                                                        )
-                                                    }
+                                                    MusiqueTabBar(
+                                                        items = allRoutes,
+                                                        selectedId = selectedId,
+                                                        onItemSelected = { item ->
+                                                            if (backStack.last() != item.route) backStack.add(
+                                                                item.route
+                                                            )
+                                                        },
+                                                        showSelectedLabel = interfaceSettings.navbarShowLabel,
+                                                        modifier = Modifier.align(Alignment.BottomCenter)
+                                                    )
                                                 }
                                             }
                                         } else {
@@ -617,28 +617,16 @@ class MainActivity : ComponentActivity() {
                                                 ) + fadeOut(),
                                                 modifier = Modifier.align(Alignment.BottomCenter),
                                             ) {
-                                                if (interfaceSettings.experimentalFloatingNav) {
-                                                    FloatingOutifyBottomNav(
-                                                        items = allRoutes,
-                                                        selectedId = selectedId,
-                                                        onItemSelected = { item ->
-                                                            if (backStack.last() != item.route) backStack.add(
-                                                                item.route
-                                                            )
-                                                        },
-                                                        showSelectedLabel = interfaceSettings.navbarShowLabel,
-                                                    )
-                                                } else {
-                                                    OutifyBottomNav(
-                                                        items = allRoutes,
-                                                        selectedId = selectedId,
-                                                        onItemSelected = { item ->
-                                                            if (backStack.last() != item.route) backStack.add(
-                                                                item.route
-                                                            )
-                                                        }
-                                                    )
-                                                }
+                                                MusiqueTabBar(
+                                                    items = allRoutes,
+                                                    selectedId = selectedId,
+                                                    onItemSelected = { item ->
+                                                        if (backStack.last() != item.route) backStack.add(
+                                                            item.route
+                                                        )
+                                                    },
+                                                    showSelectedLabel = interfaceSettings.navbarShowLabel,
+                                                )
                                             }
                                         }
                                     }

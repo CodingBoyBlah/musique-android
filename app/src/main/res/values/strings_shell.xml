@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_home">Home</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_detail_artist">Artist</string>
+    <string name="nav_detail_album">Album</string>
+    <string name="nav_detail_playlist">Playlist</string>
+    <string name="nav_detail_profile">Profile</string>
+    <string name="nav_detail_show">Show</string>
+    <string name="cd_mini_player">Mini player, tap to open Now Playing</string>
+    <string name="cd_mini_player_progress">Playback progress</string>
+</resources>
