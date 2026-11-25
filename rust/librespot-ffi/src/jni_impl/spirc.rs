@@ -46,7 +46,7 @@ pub fn device_cb() -> Option<Arc<JavaCallback>> {
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_setTransferPreferences(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_setTransferPreferences(
     _env: JNIEnv,
     _this: JClass,
     auto_transfer: jboolean,
@@ -58,7 +58,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_setTransferPreferen
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_initializeSpirc(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_initializeSpirc(
     mut env: JNIEnv,
     _this: JClass,
     callback: JObject,
@@ -136,7 +136,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_initializeSpirc(
 
 /// Records new playback settings and rebuilds the session and Connect runtime.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_requestRestart(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_requestRestart(
     mut env: JNIEnv,
     _this: JClass,
     reason: JString,
@@ -203,7 +203,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_requestRestart(
 }
 
 /// Returns the restart lifecycle snapshot as `key=value` lines.
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_diagnostics")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_diagnostics")]
 pub extern "system" fn diagnostics(_env: JNIEnv, _this: JClass) -> jstring {
     guard("Spirc.diagnostics", std::ptr::null_mut(), || {
         let text = crate::spirc::diagnostics()
@@ -222,7 +222,7 @@ pub extern "system" fn diagnostics(_env: JNIEnv, _this: JClass) -> jstring {
     })
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_shutdown")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_shutdown")]
 pub extern "system" fn shutdown(_env: JNIEnv, _this: JClass) {
     guard("Spirc.shutdown", (), || {
         crate::spirc::set_state(crate::spirc::SpircState::Stopped);
@@ -230,14 +230,14 @@ pub extern "system" fn shutdown(_env: JNIEnv, _this: JClass) {
     });
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_unregisterBufferCallback")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_unregisterBufferCallback")]
 pub extern "system" fn unregister_buffer_callback(_env: JNIEnv, _this: JClass) {
     if let Some(m) = BUFFER_CB.get() {
         *m.lock().unwrap() = None;
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_unregisterDeviceCallback")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_unregisterDeviceCallback")]
 pub extern "system" fn unregister_device_callback(_env: JNIEnv, _this: JClass) {
     if let Some(m) = DEVICE_CB.get() {
         *m.lock().unwrap() = None;
@@ -245,7 +245,7 @@ pub extern "system" fn unregister_device_callback(_env: JNIEnv, _this: JClass) {
 }
 
 // Sets the buffer callback, so we can notify UI of spirc buferring
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_bufferCallback")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_bufferCallback")]
 pub extern "system" fn set_buffer_callback(
     mut env: JNIEnv,
     _this: JClass,
@@ -269,7 +269,7 @@ pub extern "system" fn set_buffer_callback(
     1
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_deviceCallback")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_deviceCallback")]
 pub extern "system" fn set_device_callback(
     mut env: JNIEnv,
     _this: JClass,
@@ -299,7 +299,7 @@ pub extern "system" fn set_device_callback(
 
 // Loads a Spotify URI specified
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_load(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_load(
     mut env: JNIEnv,
     _this: JClass,
     juri: JString,
@@ -326,7 +326,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_load(
     })
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_shuffleLoad")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_shuffleLoad")]
 pub extern "system" fn shuffle_load(mut env: JNIEnv, _this: JClass, juri: JString) -> jboolean {
     guard("Spirc.shuffleLoad", 0, || {
         let uri = match resolve_uri_or_collection(&mut env, juri) {
@@ -348,7 +348,7 @@ pub extern "system" fn shuffle_load(mut env: JNIEnv, _this: JClass, juri: JStrin
     })
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_localLoad")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_localLoad")]
 pub extern "system" fn local_load(_env: JNIEnv, _this: JClass, _juri: JString) -> jboolean {
     error!("Using experimental function that does not work as expected!");
     let uri = SpotifyUri::Local {
@@ -374,7 +374,7 @@ pub extern "system" fn local_load(_env: JNIEnv, _this: JClass, _juri: JString) -
 
 // Adds a Spotify URI to queue
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_addToQueue(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_addToQueue(
     mut env: JNIEnv,
     _this: JClass,
     juri: JString,
@@ -414,7 +414,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_addToQueue(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_setQueue")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_setQueue")]
 pub extern "system" fn set_queue(
     mut env: JNIEnv,
     _this: JClass,
@@ -490,7 +490,7 @@ pub extern "system" fn set_queue(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_setVolume(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_setVolume(
     _env: JNIEnv,
     _this: JClass,
     jvolume: jint,
@@ -511,7 +511,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_setVolume(
 
 // Activates the Spirc session
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_activate(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_activate(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -530,7 +530,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_activate(
 
 // Transfers the Spirc session to us
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_automaticTransfer(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_automaticTransfer(
     _env: JNIEnv,
     _this: JClass,
     force_smart: jboolean,
@@ -551,7 +551,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_automaticTransfer(
 
 // Explicit manual transfers do not apply the automatic transfer policy.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_transfer(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_transfer(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -570,7 +570,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_transfer(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_seekTo(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_seekTo(
     _env: JNIEnv,
     _this: JClass,
     jposition: jlong,
@@ -588,7 +588,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_seekTo(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_shuffle")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_shuffle")]
 pub extern "system" fn shuffle_spirc(_env: JNIEnv, _this: JClass, enabled: jboolean) -> jboolean {
     let enabled = enabled != 0;
     match with_spirc(|runtime| runtime.shuffle(enabled)) {
@@ -604,7 +604,7 @@ pub extern "system" fn shuffle_spirc(_env: JNIEnv, _this: JClass, enabled: jbool
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_spirc_Spirc_repeat")]
+#[unsafe(export_name = "Java_app_musique_core_spirc_Spirc_repeat")]
 pub extern "system" fn repeat_spirc(
     _env: JNIEnv,
     _this: JClass,
@@ -626,7 +626,7 @@ pub extern "system" fn repeat_spirc(
 
 // Plays the player
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerPlay(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_playerPlay(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -645,7 +645,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerPlay(
 
 // Pauses the player
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_setPlaybackPaused(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_setPlaybackPaused(
     _env: JNIEnv,
     _this: JClass,
     paused: jboolean,
@@ -654,7 +654,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_setPlaybackPaused(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerPause(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_playerPause(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -673,7 +673,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerPause(
 
 // Plays/Pauses the player
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerPlayPause(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_playerPlayPause(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -692,7 +692,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerPlayPause(
 
 // Plays the next track
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerNext(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_playerNext(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -711,7 +711,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerNext(
 
 // Plays the previous track
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_playerPrevious(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_playerPrevious(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -735,7 +735,7 @@ struct TrackDto {
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_previousTracks(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_previousTracks(
     env: JNIEnv,
     _this: JClass,
 ) -> jstring {
@@ -786,7 +786,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_previousTracks(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_spirc_Spirc_nextTracks(
+pub extern "system" fn Java_app_musique_core_spirc_Spirc_nextTracks(
     env: JNIEnv,
     _this: JClass,
 ) -> jstring {

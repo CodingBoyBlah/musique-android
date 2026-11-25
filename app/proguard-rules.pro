@@ -1,16 +1,16 @@
--keep class cc.tomko.outify.core.SessionCallback { *; }
--keepclassmembers class * implements cc.tomko.outify.core.SessionCallback { *; }
--keep class cc.tomko.outify.core.spirc.SpircInitializationCallback { *; }
--keep class cc.tomko.outify.core.spirc.SpircBufferCallback { *; }
--keep class cc.tomko.outify.core.spirc.SpircDeviceCallback { *; }
+-keep class app.musique.core.SessionCallback { *; }
+-keepclassmembers class * implements app.musique.core.SessionCallback { *; }
+-keep class app.musique.core.spirc.SpircInitializationCallback { *; }
+-keep class app.musique.core.spirc.SpircBufferCallback { *; }
+-keep class app.musique.core.spirc.SpircDeviceCallback { *; }
 
--keep class cc.tomko.outify.playback.callbacks.PlayerEventCallback { *; }
--keepclassmembers class * implements cc.tomko.outify.playback.callbacks.PlayerEventCallback { *; }
--keep class cc.tomko.outify.playback.AudioEngine { *; }
+-keep class app.musique.playback.callbacks.PlayerEventCallback { *; }
+-keepclassmembers class * implements app.musique.playback.callbacks.PlayerEventCallback { *; }
+-keep class app.musique.playback.AudioEngine { *; }
 
 # These names/signatures are resolved by JNI, including callback implementations.
--keep class cc.tomko.outify.core.jam.JamNative { *; }
--keep interface cc.tomko.outify.core.jam.JamCallback { *; }
--keep interface cc.tomko.outify.core.jam.JamRequestCallback { *; }
--keepclassmembers class * implements cc.tomko.outify.core.jam.JamCallback { *; }
--keepclassmembers class * implements cc.tomko.outify.core.jam.JamRequestCallback { *; }
+-keep class app.musique.core.jam.JamNative { *; }
+-keep interface app.musique.core.jam.JamCallback { *; }
+-keep interface app.musique.core.jam.JamRequestCallback { *; }
+-keepclassmembers class * implements app.musique.core.jam.JamCallback { *; }
+-keepclassmembers class * implements app.musique.core.jam.JamRequestCallback { *; }

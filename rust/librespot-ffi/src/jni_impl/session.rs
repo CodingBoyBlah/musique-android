@@ -51,7 +51,7 @@ pub fn unregister_session_callback() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_Session_initializeSession(
+pub extern "system" fn Java_app_musique_core_Session_initializeSession(
     mut env: JNIEnv,
     _this: JClass,
     callback: JObject,
@@ -104,7 +104,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_Session_initializeSession(
 /// Prefer `Spirc.requestRestart`, which also rebuilds everything but reports
 /// when the rebuild finished instead of leaving callers to guess.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_Session_shutdown(
+pub extern "system" fn Java_app_musique_core_Session_shutdown(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -117,7 +117,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_Session_shutdown(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_Session_unregisterSessionCallback(
+pub extern "system" fn Java_app_musique_core_Session_unregisterSessionCallback(
     _env: JNIEnv,
     _this: JClass,
 ) {

@@ -132,7 +132,7 @@ extern "C" fn rust_pcm_trampoline(
 
 /// JNI registration function — called from Java.
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_playback_AudioEngine_registerPcmCallback(
+pub extern "system" fn Java_app_musique_playback_AudioEngine_registerPcmCallback(
     mut env: JNIEnv,
     _class: JObject,
     callback: JObject,
@@ -230,7 +230,7 @@ pub extern "system" fn Java_cc_tomko_outify_playback_AudioEngine_registerPcmCall
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_playback_AudioEngine_unregisterPcmCallback(
+pub extern "system" fn Java_app_musique_playback_AudioEngine_unregisterPcmCallback(
     _env: JNIEnv,
     _class: JObject,
 ) {

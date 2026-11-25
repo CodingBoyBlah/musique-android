@@ -25,7 +25,7 @@ const REQUEST_METHODS: [(&str, &str); 2] = [
 ];
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_registerListener(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_registerListener(
     mut env: JNIEnv,
     _this: JClass,
     callback: JObject,
@@ -48,7 +48,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_registerListener(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_unregisterListener(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_unregisterListener(
     _env: JNIEnv,
     _this: JClass,
 ) {
@@ -88,7 +88,7 @@ fn request(mut env: JNIEnv, callback: JObject, operation: Operation) -> jboolean
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_start(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_start(
     env: JNIEnv,
     _this: JClass,
     callback: JObject,
@@ -97,7 +97,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_start(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_current(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_current(
     env: JNIEnv,
     _this: JClass,
     callback: JObject,
@@ -106,7 +106,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_current(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_leave(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_leave(
     env: JNIEnv,
     _this: JClass,
     callback: JObject,
@@ -115,7 +115,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_leave(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_kick(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_kick(
     mut env: JNIEnv,
     _this: JClass,
     member_id: jni::objects::JString,
@@ -134,7 +134,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_kick(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_info(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_info(
     mut env: JNIEnv,
     _this: JClass,
     token: JString,
@@ -153,7 +153,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_info(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_join(
+pub extern "system" fn Java_app_musique_core_jam_JamNative_join(
     mut env: JNIEnv,
     _this: JClass,
     token: JString,
@@ -187,7 +187,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_jam_JamNative_join(
     })
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_jam_JamNative_extractToken")]
+#[unsafe(export_name = "Java_app_musique_core_jam_JamNative_extractToken")]
 pub extern "system" fn extract_token(
     mut env: JNIEnv,
     _this: JClass,

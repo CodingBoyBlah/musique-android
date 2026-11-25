@@ -1,0 +1,131 @@
+package app.musique.ui.viewmodel.settings
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.musique.LibrespotFfi
+import app.musique.core.spirc.SpircController
+import app.musique.data.repository.PlaybackSettings
+import app.musique.data.repository.SettingsRepository
+import app.musique.playback.model.Bitrate
+import dagger.hilt.android.lifecycle.HiltViewModel
+import jakarta.inject.Inject
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+
+@HiltViewModel
+class PlaybackSettingViewModel @Inject constructor(
+    val settingsRepository: SettingsRepository,
+    val spirc: SpircController
+) : ViewModel() {
+    private val _needsRestart = MutableStateFlow(false)
+    val needsRestart: StateFlow<Boolean> = _needsRestart
+
+    private val _isRestarting = MutableStateFlow(false)
+
+    /** `true` while a restart triggered from this screen is still running. */
+    val isRestarting: StateFlow<Boolean> = _isRestarting
+
+    val settings: Flow<PlaybackSettings> =
+        settingsRepository.playbackSettings
+
+    val romanizeLyrics: Flow<Boolean> =
+        settingsRepository.romanizeLyrics
+
+    val lyricsFallbackEnabled: Flow<Boolean> =
+        settingsRepository.lyricsFallbackEnabled
+
+    fun setGaplessPlayback(enabled: Boolean) {
+        viewModelScope.launch {
+            _needsRestart.value = true
+            settingsRepository.setGaplessPlayback(enabled)
+        }
+    }
+
+    fun setFastForwardMs(ms: Long) {
+        viewModelScope.launch {
+            settingsRepository.setFastForwardMs(ms)
+        }
+    }
+
+    fun setNormalizeAudio(enabled: Boolean) {
+        viewModelScope.launch {
+            _needsRestart.value = true
+            settingsRepository.setNormalizePlayback(enabled)
+        }
+    }
+
+    fun setKeepAlive(enabled: Boolean) {
+        viewModelScope.launch {
+            _needsRestart.value = true
+            settingsRepository.setKeepalive(enabled)
+        }
+    }
+
+    fun setBitrate(bitrate: Bitrate) {
+        viewModelScope.launch {
+            _needsRestart.value = true
+            settingsRepository.setBitrate(bitrate)
+        }
+    }
+
+    fun setCrossfade(crossfadeMillis: Int) {
+        viewModelScope.launch {
+            _needsRestart.value = true
+            settingsRepository.setCrossfade(crossfadeMillis)
+        }
+    }
+
+    fun setAutoTransfer(transfer: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setAutoTransfer(transfer)
+        }
+    }
+
+    fun setSmartTransfer(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setSmartTransfer(enabled)
+        }
+    }
+
+    fun setRomanizeLyrics(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setRomanizeLyrics(enabled)
+        }
+    }
+
+    fun setLyricsFallbackEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setLyricsFallbackEnabled(enabled)
+        }
+    }
+
+    fun setDeviceName(name: String) {
+        viewModelScope.launch {
+            _needsRestart.value = true
+            settingsRepository.setDeviceName(name)
+        }
+    }
+
+    /**
+     * Rebuilds the spirc runtime so changed playback settings take effect.
+     *
+     * Waits for the runtime to come back so the button cannot be reported as
+     * done while the rebuild is still running.
+     */
+    fun restartSpirc() {
+        if (_isRestarting.value) return
+
+        viewModelScope.launch {
+            _isRestarting.value = true
+            try {
+                if (spirc.restartAndAwaitReady("settings")) {
+                    _needsRestart.value = false
+                }
+            } finally {
+                _isRestarting.value = false
+            }
+        }
+    }
+}

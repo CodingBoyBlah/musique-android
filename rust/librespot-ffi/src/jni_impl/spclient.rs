@@ -10,7 +10,7 @@ use crate::{
     jni_utils::{optionable_string, throw_exception, vec_to_jstring_array}, outifyuri::{OutifyUri, UsernameCache}, spotify::{client::{SavedItemType, SpotifyClient}, error::SpotifyApiError},
 };
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_username")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_username")]
 pub extern "system" fn username(env: JNIEnv, _class: JClass) -> jstring {
     let username = match crate::spclient::get_username() {
         Ok(u) => u,
@@ -29,7 +29,7 @@ pub extern "system" fn username(env: JNIEnv, _class: JClass) -> jstring {
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getCurrentUserProfile")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getCurrentUserProfile")]
 pub extern "system" fn get_current_user(env: JNIEnv, _class: JClass) -> jstring {
     let client = SpotifyClient::get();
 
@@ -58,7 +58,7 @@ pub extern "system" fn get_current_user(env: JNIEnv, _class: JClass) -> jstring 
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_search")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_search")]
 pub extern "system" fn spotify_search(
     mut env: JNIEnv,
     _class: JClass,
@@ -107,7 +107,7 @@ pub extern "system" fn spotify_search(
     vec_to_jstring_array(&mut env, uris)
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getHomeFeed")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getHomeFeed")]
 pub extern "system" fn get_home_feed(
     mut env: JNIEnv,
     _class: JClass,
@@ -147,7 +147,7 @@ pub extern "system" fn get_home_feed(
     })
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_saveItems")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_saveItems")]
 pub extern "system" fn save_item(mut env: JNIEnv, _class: JClass, uris: JObjectArray) -> jboolean {
     let client = SpotifyClient::get();
 
@@ -181,7 +181,7 @@ pub extern "system" fn save_item(mut env: JNIEnv, _class: JClass, uris: JObjectA
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_deleteItems")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_deleteItems")]
 pub extern "system" fn delete_items(
     mut env: JNIEnv,
     _class: JClass,
@@ -219,7 +219,7 @@ pub extern "system" fn delete_items(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getSavedItems")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getSavedItems")]
 pub extern "system" fn get_saved_items(
     mut env: JNIEnv,
     _class: JClass,
@@ -280,7 +280,7 @@ pub extern "system" fn get_saved_items(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_isFollowingUser")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_isFollowingUser")]
 pub extern "system" fn is_following_user(
     mut env: JNIEnv,
     _class: JClass,
@@ -312,7 +312,7 @@ pub extern "system" fn is_following_user(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getSavedEpisodeItems")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getSavedEpisodeItems")]
 pub extern "system" fn get_saved_episode_items(mut env: JNIEnv, _class: JClass) -> jstring {
     let client = SpotifyClient::get();
 
@@ -350,7 +350,7 @@ pub extern "system" fn get_saved_episode_items(mut env: JNIEnv, _class: JClass) 
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getEpisodeDetails")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getEpisodeDetails")]
 pub extern "system" fn get_episode_details(
     mut env: JNIEnv,
     _class: JClass,
@@ -404,7 +404,7 @@ pub extern "system" fn get_episode_details(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_transferPlaybackDevice")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_transferPlaybackDevice")]
 pub extern "system" fn transfer_playback_device(
     mut env: JNIEnv,
     _class: JClass,
@@ -460,7 +460,7 @@ pub extern "system" fn transfer_playback_device(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getDevices")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getDevices")]
 pub extern "system" fn get_devices(mut env: JNIEnv, _class: JClass) -> jstring {
     let client = SpotifyClient::get();
 
@@ -492,7 +492,7 @@ pub extern "system" fn get_devices(mut env: JNIEnv, _class: JClass) -> jstring {
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getConnectPlayback")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getConnectPlayback")]
 pub extern "system" fn get_connect_playback(mut env: JNIEnv, _class: JClass) -> jstring {
     let result = crate::spirc::playback_snapshot()
         .and_then(|s| serde_json::to_string(&s).map_err(librespot_core::Error::internal));
@@ -508,7 +508,7 @@ pub extern "system" fn get_connect_playback(mut env: JNIEnv, _class: JClass) -> 
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_sendConnectCommand")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_sendConnectCommand")]
 pub extern "system" fn send_connect_command(
     mut env: JNIEnv,
     _class: JClass,
@@ -535,7 +535,7 @@ pub extern "system" fn send_connect_command(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_addToPlaylist")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_addToPlaylist")]
 pub extern "system" fn add_to_playlist(
     mut env: JNIEnv,
     _class: JClass,
@@ -582,7 +582,7 @@ pub extern "system" fn add_to_playlist(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_deleteFromPlaylist")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_deleteFromPlaylist")]
 pub extern "system" fn delete_from_playlist(
     mut env: JNIEnv,
     _class: JClass,
@@ -629,7 +629,7 @@ pub extern "system" fn delete_from_playlist(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_createPlaylist")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_createPlaylist")]
 pub extern "system" fn create_playlist(
     mut env: JNIEnv,
     _class: JClass,
@@ -675,7 +675,7 @@ pub extern "system" fn create_playlist(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_modifyPlaylist")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_modifyPlaylist")]
 pub extern "system" fn modify_playlist(
     mut env: JNIEnv,
     _class: JClass,
@@ -734,7 +734,7 @@ pub extern "system" fn modify_playlist(
 // Searches for tracks using context
 #[unsafe(no_mangle)]
 #[deprecated]
-pub extern "system" fn Java_cc_tomko_outify_core_SpClient_searchContext(
+pub extern "system" fn Java_app_musique_core_SpClient_searchContext(
     mut env: JNIEnv,
     _class: JClass,
     query: JString,
@@ -792,7 +792,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_SpClient_searchContext(
 
 // Gets user collection
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getCollectionSession(
+pub extern "system" fn Java_app_musique_core_SpClient_getCollectionSession(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
@@ -818,7 +818,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getCollectionSession(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getSavedTrackCollection(
+pub extern "system" fn Java_app_musique_core_SpClient_getSavedTrackCollection(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
@@ -853,7 +853,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getSavedTrackCollectio
 
 // Query can be used to get liked songs from artist
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getUserCollection(
+pub extern "system" fn Java_app_musique_core_SpClient_getUserCollection(
     mut env: JNIEnv,
     _class: JClass,
     query: JString,
@@ -903,7 +903,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getUserCollection(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getRootlist(
+pub extern "system" fn Java_app_musique_core_SpClient_getRootlist(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jobjectArray {
@@ -934,7 +934,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_SpClient_getRootlist(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getRadioForTrack")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getRadioForTrack")]
 pub extern "system" fn get_radio_for_track(
     mut env: JNIEnv,
     _class: JClass,
@@ -994,7 +994,7 @@ pub extern "system" fn get_radio_for_track(
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_getLyrics")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_getLyrics")]
 pub extern "system" fn get_lyrics_for_track(
     mut env: JNIEnv,
     _class: JClass,
@@ -1083,7 +1083,7 @@ fn classify_spclient_error(err: &crate::spotify::error::SpotifyApiError) -> &'st
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_SpClient_isPlaybackAuthenticated")]
+#[unsafe(export_name = "Java_app_musique_core_SpClient_isPlaybackAuthenticated")]
 pub extern "system" fn is_playback_authenticated(_env: JNIEnv, _class: JClass) -> jboolean {
     let client = SpotifyClient::get();
 

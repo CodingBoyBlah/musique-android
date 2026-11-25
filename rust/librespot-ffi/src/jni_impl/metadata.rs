@@ -22,7 +22,7 @@ const SPOTIFY_ITEM_TYPE_LOCAL: &str = "local";
 #[allow(unused)]
 const SPOTIFY_ITEM_TYPE_UNKNOWN: &str = "unknown";
 
-#[unsafe(export_name = "Java_cc_tomko_outify_data_metadata_NativeMetadata_getNativeMetadata")]
+#[unsafe(export_name = "Java_app_musique_data_metadata_NativeMetadata_getNativeMetadata")]
 pub extern "system" fn get_native_metadata(
     mut env: jni::JNIEnv,
     _this: JClass,
@@ -236,7 +236,7 @@ fn convert_to_string<T: serde::Serialize>(metadata: &T) -> Option<String> {
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_data_metadata_NativeMetadata_getNativeTracks(
+pub extern "system" fn Java_app_musique_data_metadata_NativeMetadata_getNativeTracks(
     mut env: jni::JNIEnv,
     _this: JClass,
     uris_json: JString,

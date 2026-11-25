@@ -35,7 +35,7 @@ pub fn player_cb() -> Option<Arc<JavaCallback>> {
 
 // Registers the track update callback and caches its method IDs
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_playback_AudioEngine_registerPlayerEventListener(
+pub extern "system" fn Java_app_musique_playback_AudioEngine_registerPlayerEventListener(
     mut env: JNIEnv,
     _this: JClass,
     callback: JObject,
@@ -53,7 +53,7 @@ pub extern "system" fn Java_cc_tomko_outify_playback_AudioEngine_registerPlayerE
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_playback_AudioEngine_unregisterPlayerEventListener(
+pub extern "system" fn Java_app_musique_playback_AudioEngine_unregisterPlayerEventListener(
     _env: JNIEnv,
     _this: JClass,
 ) {

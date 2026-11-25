@@ -15,7 +15,7 @@
     <string name="repeat_mode_off">Без повтора</string>
     <string name="like">Нравится</string>
     <string name="outify_playback_widget_description">Быстрый способ воспроизводить любимые треки</string>
-    <string name="homescreen_most_listened_disclaimer">Обратите внимание, что эти данные получены из Spotify. Outify не отслеживает ваших любимых исполнителей и треки, поэтому эти данные получены из официальных приложений Spotify.</string>
+    <string name="homescreen_most_listened_disclaimer">Обратите внимание, что эти данные получены из Spotify. Musique не отслеживает ваших любимых исполнителей и треки, поэтому эти данные получены из официальных приложений Spotify.</string>
     <string name="welcome_back">С возвращением,\n%1$s!</string>
     <string name="homescreen_top_artists">Любимые артисты</string>
     <string name="homescreen_top_tracks">Любимые треки</string>

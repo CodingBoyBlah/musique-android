@@ -21,9 +21,9 @@
     <string name="devices_remote_volume">Volume on %1$s</string>
     <string name="devices_playback_not_ready">Device discovery needs a ready playback login. Sign in for playback or wait for reconnection.</string>
     <string name="devices_loading">Waiting for Spotify Connect devices…</string>
-    <string name="app_name" translatable="false">Outify</string>
+    <string name="app_name" translatable="false">Musique</string>
     <string name="title_activity_auth" translatable="false">AuthActivity</string>
-    <string name="title_activity_main" translatable="false">Outify</string>
+    <string name="title_activity_main" translatable="false">Musique</string>
     <string name="title_activity_callback" translatable="false">CallbackActivity</string>
     <string name="title_activity_home_screen" translatable="false">HomeScreen</string>
     <string name="audio_playback_attribution">This app plays audio</string>
@@ -41,7 +41,7 @@
     <string name="repeat_mode_off">No repeat</string>
     <string name="like">Like</string>
     <string name="outify_playback_widget_description">Fast way to play your favorite tracks</string>
-    <string name="homescreen_most_listened_disclaimer">Note, that these data are fetched from Spotify. Outify doesn\'t track your top artists nor tracks and therefore this data shows data retrieved by official Spotify applications.</string>
+    <string name="homescreen_most_listened_disclaimer">Note, that these data are fetched from Spotify. Musique doesn\'t track your top artists nor tracks and therefore this data shows data retrieved by official Spotify applications.</string>
     <string name="welcome_back">Welcome back,\n%1$s!</string>
     <string name="homescreen_top_artists">Top Artists</string>
     <string name="homescreen_top_tracks">Top Tracks</string>
@@ -158,7 +158,7 @@
     <string name="widget_adding">Adding</string>
     <string name="widget_your_widgets">YOUR WIDGETS</string>
     <string name="widget_none">No widgets on your home screen</string>
-    <string name="widget_hint">Long-press your home screen and add an Outify widget first.</string>
+    <string name="widget_hint">Long-press your home screen and add an Musique widget first.</string>
     <string name="widget_name">Widget</string>
     <string name="widget_add_here">Add here</string>
     <string name="widget_current_tracks">Current tracks — tap to remove</string>
@@ -223,7 +223,7 @@
     <string name="liked_you_count">You have %1$d liked songs</string>
     <string name="album_song_count">%1$s • %2$d songs</string>
     <string name="show_episode_count">%1$s • %2$d episodes</string>
-    <string name="title_with_app">%1$s - Outify</string>
+    <string name="title_with_app">%1$s - Musique</string>
     <string name="playlist_number">Playlist %1$d</string>
     <string name="liked_position">Position #%1$d</string>
     <string name="error_format">Error: %1$s</string>
@@ -297,8 +297,8 @@
     <string name="search_loading_albums">Loading albums…</string>
     <string name="search_loading_shows">Loading shows...</string>
     <string name="search_loading_episodes">Loading episodes…</string>
-    <string name="onb_playback_login_desc">A Spotify Premium subscription is required. This login is required to stream audio. Outify uses librespot with anonymous Spotify credentials to power playback - independent of your personal account.</string>
-    <string name="onb_stream_tracks">Stream tracks from Outify</string>
+    <string name="onb_playback_login_desc">A Spotify Premium subscription is required. This login is required to stream audio. Musique uses librespot with anonymous Spotify credentials to power playback - independent of your personal account.</string>
+    <string name="onb_stream_tracks">Stream tracks from Musique</string>
     <string name="onb_view_content">View artists, albums and playlists</string>
     <string name="onb_keep_synced">Keep your listening synced</string>
     <string name="onb_playback_connected">Playback login connected</string>
@@ -307,17 +307,17 @@
     <string name="onb_manage_playlists">Create and manage your playlists</string>
     <string name="onb_account_connected">Account connected</string>
     <string name="onb_why_two">Why two logins?</string>
-    <string name="onb_librespot_desc">Outify uses librespot to stream audio. librespot authenticates with Spotify\'s streaming protocol using anonymous credentials — it operates independently of your Spotify account and cannot access your personal data.</string>
+    <string name="onb_librespot_desc">Musique uses librespot to stream audio. librespot authenticates with Spotify\'s streaming protocol using anonymous credentials — it operates independently of your Spotify account and cannot access your personal data.</string>
     <string name="onb_oauth_desc">This optional OAuth login enables personal top artists and tracks. Search, streaming, library, playlist and social features use your playback login instead.</string>
     <string name="onb_premium_required">Spotify Premium required</string>
-    <string name="onb_premium_learn">Outify only works with a Spotify Premium account. Tap to learn why.</string>
+    <string name="onb_premium_learn">Musique only works with a Spotify Premium account. Tap to learn why.</string>
     <string name="onb_required_streaming">Required for audio streaming.</string>
     <string name="onb_anon_creds">Uses anonymous credentials embedded in librespot to authenticate with Spotify\'s streaming protocol. Not linked to your personal Spotify account.</string>
     <string name="onb_real_account">Your real Spotify account, connected via OAuth.</string>
     <string name="onb_features_by_login">Features available based on your login status:</string>
     <string name="onb_available_scopes">Available scopes:</string>
     <string name="battery_title">Keep the music going</string>
-    <string name="battery_desc">Exempt Outify from battery optimization so playback and syncs don\'t get cut off in the background.</string>
+    <string name="battery_desc">Exempt Musique from battery optimization so playback and syncs don\'t get cut off in the background.</string>
     <string name="battery_action">Disable battery optimization</string>
     <string name="notif_permission_title">Stay in sync</string>
     <string name="notif_permission_desc">Get notified when your library finishes syncing tracks.</string>
@@ -365,7 +365,7 @@
     <string name="settings_padding_desc">Leave room for system navigation to show - mainly button navigation.</string>
     <string name="settings_appearance_track_theme_desc">Colorscheme will change according to current track</string>
     <string name="settings_appearance_system_theme_desc">Colorscheme will adapt to your system\'s colorscheme</string>
-    <string name="settings_appearance_accent_desc">Color of Outify\'s interface</string>
+    <string name="settings_appearance_accent_desc">Color of Musique\'s interface</string>
     <string name="settings_appearance_amoled">Use AMOLED black</string>
     <string name="settings_appearance_monochrome">Every image will be black &amp; white</string>
     <string name="settings_mono_album_desc">Album artwork in album views will be monochrome</string>
@@ -393,7 +393,7 @@
     <string name="settings_resurrect_desc">Allow resurrection from notification</string>
     <string name="settings_romanize_desc">Show romanized text beneath original lyrics</string>
     <string name="settings_lyrics_fallback_desc">When Spotify has no lyrics, look for synced lyrics on lrclib.net. Sends the track title, artist, album and duration to LRCLIB.</string>
-    <string name="settings_connect_desc">Make Outify the active device to stream from</string>
+    <string name="settings_connect_desc">Make Musique the active device to stream from</string>
     <string name="settings_playback_login_desc">This login is mandatory to allow for playback. It uses fake Spotify credentials to stream audio.</string>
     <string name="settings_account_login_desc">This optional login enables personal top artists and tracks. Search, library, playlist, podcast and user-follow operations use your playback login.</string>
     <string name="settings_librespot_creds">librespot · anonymous streaming credentials</string>
@@ -404,7 +404,7 @@
     <string name="settings_keepalive">Keepalive</string>
     <string name="settings_auto_transfer">Auto transfer</string>
     <string name="settings_smart_transfer">Smart transfer</string>
-    <string name="settings_smart_transfer_desc">On startup or reconnect, transfer playback to Outify only when you are not in a Jam and no other device is active.</string>
+    <string name="settings_smart_transfer_desc">On startup or reconnect, transfer playback to Musique only when you are not in a Jam and no other device is active.</string>
     <string name="settings_romanize">Romanize lyrics</string>
     <string name="settings_lyrics_fallback">Fallback lyrics from LRCLIB</string>
     <string name="settings_advanced">Advanced settings</string>

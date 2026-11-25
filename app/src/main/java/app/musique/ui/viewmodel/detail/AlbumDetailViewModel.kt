@@ -1,0 +1,213 @@
+package app.musique.ui.viewmodel.detail
+
+import android.util.Log
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.musique.core.SpClient
+import app.musique.core.model.PlayableAudio
+import app.musique.core.model.Track
+import app.musique.core.model.toPlayableAudio
+import app.musique.core.spirc.SpircController
+import app.musique.core.spirc.SpircWrapper
+import app.musique.data.dao.LikedDao
+import app.musique.data.metadata.Metadata
+import app.musique.playback.PlaybackStateHolder
+import app.musique.ui.screens.library.album.AlbumUiState
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import javax.inject.Inject
+
+private const val ALBUM_STATE_KEY = "album_state"
+
+@HiltViewModel
+class AlbumDetailViewModel @Inject constructor(
+    private val metadata: Metadata,
+    private val playbackStateHolder: PlaybackStateHolder,
+    val spirc: SpircWrapper,
+    private val spircController: SpircController,
+    val spClient: SpClient,
+    val json: Json,
+    val likedDao: LikedDao,
+    private val savedStateHandle: SavedStateHandle,
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(
+        savedStateHandle.get<String>(ALBUM_STATE_KEY)?.let {
+            try {
+                json.decodeFromString<AlbumUiState>(it)
+            } catch (e: Exception) {
+                AlbumUiState()
+            }
+        } ?: AlbumUiState()
+    )
+    val uiState: StateFlow<AlbumUiState> = _uiState
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val likedTrackIds: StateFlow<Set<String>> =
+        likedDao.observeLikedIds()
+            .map { it.toHashSet() }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptySet()
+            )
+
+    val currentAudio: StateFlow<PlayableAudio?> = playbackStateHolder.state
+        .map { it.currentAudio }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null
+        )
+
+    val isPlaying: StateFlow<Boolean> = playbackStateHolder.state
+        .map { it.isPlaying }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false
+        )
+
+    private val _isSaved = MutableStateFlow(false)
+    val isSaved: StateFlow<Boolean> = _isSaved
+    private val saveMutex = Mutex()
+
+    fun toggleSave() {
+        viewModelScope.launch {
+            saveMutex.withLock {
+                val uri = _uiState.value.album?.uri ?: return@withLock
+                val wasSaved = _isSaved.value
+                val success = withContext(Dispatchers.IO) {
+                    if (wasSaved) spClient.deleteItems(arrayOf(uri)) else spClient.saveItems(arrayOf(uri))
+                }
+                if (!success) {
+                    Log.w("AlbumDetailViewModel", "Could not update saved album")
+                    return@withLock
+                }
+                if (wasSaved) metadata.removeLikedAlbum(uri) else metadata.addLikedAlbum(uri)
+                if (_uiState.value.album?.uri == uri) _isSaved.value = !wasSaved
+            }
+        }
+    }
+
+    private var _lastAlbumUri: String? = null
+
+    fun retry() {
+        val uri = _lastAlbumUri ?: return
+        viewModelScope.launch {
+            spircController.restartAndAwaitReady("album retry")
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            loadAlbum(uri)
+        }
+    }
+
+    private fun checkIsSaved(albumUri: String) {
+        viewModelScope.launch {
+            try {
+                saveMutex.withLock {
+                    val saved = metadata.isLikedAlbum(albumUri)
+                    if (_uiState.value.album?.uri == albumUri) _isSaved.value = saved
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w("AlbumDetailViewModel", "Could not read saved album state", error)
+            }
+        }
+    }
+
+    private fun saveState(state: AlbumUiState) {
+        savedStateHandle[ALBUM_STATE_KEY] = json.encodeToString(AlbumUiState.serializer(), state)
+    }
+
+    suspend fun loadAlbum(albumUri: String) {
+        _lastAlbumUri = albumUri
+        try {
+            val album = withContext(Dispatchers.IO) {
+                metadata.getAlbumMetadata(albumUri)
+            }
+
+            if (album == null) {
+                val newState = AlbumUiState(
+                    isLoading = false,
+                    error = "Album not found"
+                )
+                _uiState.value = newState
+                saveState(newState)
+                return
+            }
+
+            val trackUris: List<String> = album.tracks.map { it }
+
+            val tracks: List<Track> = if (trackUris.isNotEmpty()) {
+                withContext(Dispatchers.IO) {
+                    metadata.getTrackMetadata(trackUris)
+                }
+            } else emptyList()
+
+            val newState = AlbumUiState(
+                isLoading = false,
+                album = album,
+                tracks = tracks,
+            )
+            _uiState.value = newState
+            _isSaved.value = false
+            checkIsSaved(albumUri)
+            saveState(newState)
+        } catch (e: Exception) {
+            val newState = AlbumUiState(
+                isLoading = false,
+                error = e.message
+            )
+            _uiState.value = newState
+            saveState(newState)
+        }
+    }
+
+    suspend fun loadAlbumFromTrackUri(trackUri: String) {
+        try {
+            val albumId = withContext(Dispatchers.IO) {
+                metadata.getTrackAlbumId(trackUri)
+            }
+
+            if (albumId == null) {
+                val newState = AlbumUiState(
+                    isLoading = false,
+                    error = "Album for track not found"
+                )
+                _uiState.value = newState
+                saveState(newState)
+                return
+            }
+
+            loadAlbum("spotify:album:$albumId")
+        } catch (e: Exception) {
+            val newState = AlbumUiState(
+                isLoading = false,
+                error = e.message
+            )
+            _uiState.value = newState
+            saveState(newState)
+        }
+    }
+
+    fun setTrack(track: Track) {
+        playbackStateHolder.setAudio(track.toPlayableAudio())
+    }
+}

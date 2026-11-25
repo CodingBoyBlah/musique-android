@@ -15,7 +15,7 @@
     <string name="repeat_mode_off">Kein wiederholen</string>
     <string name="like">Gefällt mir</string>
     <string name="outify_playback_widget_description">Schneller weg um deine Lieblings Titel wiederzugeben</string>
-    <string name="homescreen_most_listened_disclaimer">Bitte beachte, dass diese Daten von Spotify abgerufen werden. Outify erfasst weder deine meistgehörten Künstler noch deine meistgehörten Titel; die angezeigten Daten stammen daher aus offizilen Spotify Diensten.</string>
+    <string name="homescreen_most_listened_disclaimer">Bitte beachte, dass diese Daten von Spotify abgerufen werden. Musique erfasst weder deine meistgehörten Künstler noch deine meistgehörten Titel; die angezeigten Daten stammen daher aus offizilen Spotify Diensten.</string>
     <string name="welcome_back">Willkommen zurück, \n%1$s!</string>
     <string name="homescreen_top_artists">Top Künstler</string>
     <string name="homescreen_top_tracks">Top Titel</string>

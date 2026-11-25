@@ -1,0 +1,544 @@
+package app.musique.ui.viewmodel
+
+import android.util.Log
+import androidx.annotation.StringRes
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import app.musique.R
+import app.musique.core.SpClient
+import app.musique.core.UserProfile
+import app.musique.core.model.Album
+import app.musique.core.model.Artist
+import app.musique.core.model.Episode
+import app.musique.core.model.OutifyUri
+import app.musique.core.model.PlayableAudio
+import app.musique.core.model.Playlist
+import app.musique.core.model.Profile
+import app.musique.core.model.Show
+import app.musique.core.model.Track
+import app.musique.core.model.getCover
+import app.musique.core.spirc.SpircWrapper
+import app.musique.data.dao.LikedDao
+import app.musique.data.metadata.Metadata
+import app.musique.data.repository.CollectionLease
+import app.musique.data.repository.CollectionSessionState
+import app.musique.data.repository.SearchRepository
+import app.musique.data.repository.SettingsRepository
+import app.musique.playback.PlaybackStateHolder
+import app.musique.reccobeats.RecommendationConfig
+import app.musique.reccobeats.Recommendations
+import app.musique.ui.model.search.SearchHistoryItem
+import app.musique.ui.model.search.SearchResultType
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import javax.inject.Inject
+
+@OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+@HiltViewModel
+class SearchViewModel @Inject constructor(
+    val metadata: Metadata,
+    val spirc: SpircWrapper,
+    val spClient: SpClient,
+    private val repository: SearchRepository,
+    private val playbackStateHolder: PlaybackStateHolder,
+    private val settingsRepository: SettingsRepository,
+    private val recommendations: Recommendations,
+    private val likedDao: LikedDao,
+    private val json: Json,
+    private val userProfile: UserProfile,
+    private val collectionSessions: CollectionSessionState,
+) : ViewModel() {
+    private val queryFlow = MutableStateFlow("")
+
+    private val _results = MutableStateFlow<List<SearchUiModel>>(emptyList())
+    val results: StateFlow<List<SearchUiModel>> = _results
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    val isLoggedIn: StateFlow<Boolean> = collectionSessions.current
+        .map { it != null }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, collectionSessions.current.value != null)
+
+    private val _isRecommendationMode = MutableStateFlow(false)
+    val isRecommendationMode: StateFlow<Boolean> = _isRecommendationMode
+
+    val currentAudio: StateFlow<PlayableAudio?> = playbackStateHolder.state
+        .map { it.currentAudio }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null
+        )
+
+    val isPlaying: StateFlow<Boolean> = playbackStateHolder.state
+        .map { it.isPlaying }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = false
+        )
+
+    val searchHistory: StateFlow<List<SearchHistoryItem>> = settingsRepository.searchHistory
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    val historyResults: StateFlow<List<SearchUiModel>> = searchHistory
+        .mapLatest { items -> resolveHistoryItems(items) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    private val authorsCache = mutableMapOf<String, List<Profile>>()
+    private val _authors = MutableStateFlow<Map<String, Profile>>(emptyMap())
+    val authors: StateFlow<Map<String, Profile>> = _authors
+
+    init {
+        viewModelScope.launch {
+            queryFlow
+                .debounce(500)
+                .distinctUntilChanged()
+                .combine(collectionSessions.current) { query, lease -> query to lease }
+                .collectLatest { (query, lease) ->
+
+                    if (query.isBlank() || lease == null) {
+                        _results.value = emptyList()
+                        return@collectLatest
+                    }
+
+                    _results.value = listOf(
+                        SearchUiModel.SectionHeader(R.string.search_section_tracks),
+                        SearchUiModel.SkeletonItem(0),
+                        SearchUiModel.SectionHeader(R.string.search_section_artists),
+                        SearchUiModel.SkeletonItem(1),
+                        SearchUiModel.SectionHeader(R.string.search_section_albums),
+                        SearchUiModel.SkeletonItem(2),
+                        SearchUiModel.SectionHeader(R.string.search_section_playlists),
+                        SearchUiModel.SkeletonItem(3),
+                        SearchUiModel.SectionHeader(R.string.search_section_shows),
+                        SearchUiModel.SkeletonItem(4),
+                        SearchUiModel.SectionHeader(R.string.search_section_episodes),
+                        SearchUiModel.SkeletonItem(5),
+                    )
+
+                    coroutineScope {
+                        launch {
+                            searchSection(query, lease, "track", R.string.search_section_tracks) { uris ->
+                                withContext(Dispatchers.IO) {
+                                    metadata.getTrackMetadata(uris).map { track ->
+                                        SearchUiModel.TrackItem(track.uri, track)
+                                    }
+                                }
+                            }
+                        }
+
+                        launch {
+                            searchSection(query, lease, "artist", R.string.search_section_artists) { uris ->
+                                withContext(Dispatchers.IO) {
+                                    uris.mapNotNull { uri ->
+                                        runCatching {
+                                            metadata.getArtistMetadata(uri)
+                                        }.getOrNull()?.let { artist ->
+                                            SearchUiModel.ArtistItem(uri, artist)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        launch {
+                            searchSection(query, lease, "album", R.string.search_section_albums) { uris ->
+                                withContext(Dispatchers.IO) {
+                                    uris.mapNotNull { uri ->
+                                        runCatching {
+                                            metadata.getAlbumMetadata(uri)
+                                        }.getOrNull()?.let { album ->
+                                            SearchUiModel.AlbumItem(uri, album)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        launch {
+                            searchSection(query, lease, "playlist", R.string.search_section_playlists) { uris ->
+                                withContext(Dispatchers.IO) {
+                                    uris.mapNotNull { uri ->
+                                        runCatching {
+                                            metadata.getPlaylistMetadata(uri, true)
+                                        }.getOrNull()?.let { playlist ->
+                                            SearchUiModel.PlaylistItem(uri, playlist)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        launch {
+                            searchSection(query, lease, "show", R.string.search_section_shows) { uris ->
+                                withContext(Dispatchers.IO) {
+                                    uris.mapNotNull { uri ->
+                                        runCatching {
+                                            metadata.getShowMetadata(uri)
+                                        }.getOrNull()?.let { show ->
+                                            SearchUiModel.ShowItem(uri, show)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        launch {
+                            searchSection(query, lease, "episode", R.string.search_section_episodes) { uris ->
+                                withContext(Dispatchers.IO) {
+                                    runCatching {
+                                        metadata.getEpisodeMetadata(uris)
+                                    }.getOrNull()
+                                        ?.map { episode ->
+                                            SearchUiModel.EpisodeItem(episode.uri, episode)
+                                        }
+                                        ?: emptyList()
+                                }
+                            }
+                        }
+                    }
+                }
+        }
+    }
+
+    /**
+     * Resolves [items] into display models, preserving history order.
+     */
+    private suspend fun resolveHistoryItems(
+        items: List<SearchHistoryItem>
+    ): List<SearchUiModel> = coroutineScope {
+        if (items.isEmpty()) return@coroutineScope emptyList()
+
+        val urisByType = items.groupBy { it.type }
+
+        val trackModels = async(Dispatchers.IO) {
+            loadTrackHistoryModels(urisByType[SearchResultType.TRACK].orEmpty().map { it.uri })
+        }
+        val episodeModels = async(Dispatchers.IO) {
+            loadEpisodeHistoryModels(urisByType[SearchResultType.EPISODE].orEmpty().map { it.uri })
+        }
+        val artistModels = async(Dispatchers.IO) {
+            loadHistoryByType(urisByType, SearchResultType.ARTIST) { uri ->
+                metadata.getArtistMetadata(uri)?.let { SearchUiModel.ArtistItem(uri, it) }
+            }
+        }
+        val albumModels = async(Dispatchers.IO) {
+            loadHistoryByType(urisByType, SearchResultType.ALBUM) { uri ->
+                metadata.getAlbumMetadata(uri)?.let { SearchUiModel.AlbumItem(uri, it) }
+            }
+        }
+        val playlistModels = async(Dispatchers.IO) {
+            loadHistoryByType(urisByType, SearchResultType.PLAYLIST) { uri ->
+                metadata.getPlaylistMetadata(uri, true)?.let { SearchUiModel.PlaylistItem(uri, it) }
+            }
+        }
+        val showModels = async(Dispatchers.IO) {
+            loadHistoryByType(urisByType, SearchResultType.SHOW) { uri ->
+                metadata.getShowMetadata(uri)?.let { SearchUiModel.ShowItem(uri, it) }
+            }
+        }
+
+        val modelsByUri = buildMap<String, SearchUiModel> {
+            putAll(trackModels.await())
+            putAll(episodeModels.await())
+            putAll(artistModels.await())
+            putAll(albumModels.await())
+            putAll(playlistModels.await())
+            putAll(showModels.await())
+        }
+
+        items.mapNotNull { modelsByUri[it.uri] }
+    }
+
+    private suspend fun loadTrackHistoryModels(uris: List<String>): Map<String, SearchUiModel> {
+        if (uris.isEmpty()) return emptyMap()
+
+        val tracks = runCatching { metadata.getTrackMetadata(uris) }
+            .onFailure { Log.w("SearchViewModel", "Failed to load history tracks", it) }
+            .getOrDefault(emptyList())
+
+        return tracks.associate { track ->
+            val model: SearchUiModel = SearchUiModel.TrackItem(track.uri, track)
+            track.uri to model
+        }
+    }
+
+    private suspend fun loadEpisodeHistoryModels(uris: List<String>): Map<String, SearchUiModel> {
+        if (uris.isEmpty()) return emptyMap()
+
+        val episodes = runCatching { metadata.getEpisodeMetadata(uris) }
+            .onFailure { Log.w("SearchViewModel", "Failed to load history episodes", it) }
+            .getOrDefault(emptyList())
+
+        return episodes.associate { episode ->
+            val model: SearchUiModel = SearchUiModel.EpisodeItem(episode.uri, episode)
+            episode.uri to model
+        }
+    }
+
+    /**
+     * Resolves every history entry of [type] concurrently. Each failure is logged and dropped
+     */
+    private suspend fun loadHistoryByType(
+        urisByType: Map<SearchResultType, List<SearchHistoryItem>>,
+        type: SearchResultType,
+        load: suspend (String) -> SearchUiModel?
+    ): Map<String, SearchUiModel> = coroutineScope {
+        urisByType[type].orEmpty().map { item ->
+            async(Dispatchers.IO) {
+                item.uri to runCatching { load(item.uri) }
+                    .onFailure {
+                        Log.w(
+                            "SearchViewModel",
+                            "Failed to load history $type for ${item.uri}",
+                            it
+                        )
+                    }
+                    .getOrNull()
+            }
+        }.awaitAll().mapNotNull { (uri, model) -> model?.let { uri to it } }.toMap()
+    }
+
+    private suspend fun searchSection(
+        query: String,
+        lease: CollectionLease,
+        type: String,
+        headerRes: Int,
+        fetch: suspend (List<String>) -> List<SearchUiModel>,
+    ) {
+        try {
+            val results = repository.searchByType(query, type)
+            currentCoroutineContext().ensureActive()
+            collectionSessions.ensureCurrent(lease)
+            if (queryFlow.value != query) return
+            val items = if (results.isNotEmpty()) {
+                fetch(results.map { it.uri })
+            } else emptyList()
+            currentCoroutineContext().ensureActive()
+            collectionSessions.ensureCurrent(lease)
+            if (queryFlow.value == query) replaceSkeleton(headerRes, items)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            Log.w("SearchViewModel", "$type search failed", e)
+            if (queryFlow.value == query && collectionSessions.current.value == lease) {
+                replaceSkeleton(headerRes, emptyList())
+            }
+        }
+    }
+
+    private fun replaceSkeleton(headerRes: Int, items: List<SearchUiModel>) {
+        _results.update { current ->
+            val out = current.toMutableList()
+            val headerIdx =
+                out.indexOfLast { it is SearchUiModel.SectionHeader && it.titleRes == headerRes }
+            if (headerIdx < 0) return@update current
+            val skeletonIdx = headerIdx + 1
+            if (skeletonIdx >= out.size || out[skeletonIdx] !is SearchUiModel.SkeletonItem) return@update current
+
+            if (items.isEmpty()) {
+                out.removeAt(skeletonIdx)
+                out.removeAt(headerIdx)
+            } else {
+                out[skeletonIdx] = items.first()
+                out.addAll(skeletonIdx + 1, items.drop(1))
+            }
+            out
+        }
+    }
+
+    fun onQueryChange(query: String) {
+        queryFlow.value = query
+    }
+
+    fun fetchRecommendations(seedIds: List<String>, config: RecommendationConfig) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val trackIds = recommendations.fetchRecommendations(50, seedIds.toTypedArray(), config)
+            if (trackIds.isEmpty()) {
+                _isLoading.value = false
+                return@launch
+            }
+            val uris = trackIds.map { "spotify:track:$it" }
+            val tracks = withContext(Dispatchers.IO) {
+                metadata.getTrackMetadata(uris)
+            }
+            loadTrackResults(tracks)
+        }
+    }
+
+    fun loadTrackResults(tracks: List<Track>) {
+        _results.value = tracks.map { SearchUiModel.TrackItem(it.uri, it) }
+        _isRecommendationMode.value = true
+        _isLoading.value = false
+    }
+
+    suspend fun getArtworkUrl(playlist: Playlist): String? {
+        return playlist.getCover(metadata)
+    }
+
+    suspend fun getAuthors(playlist: Playlist): List<Profile> = coroutineScope {
+        authorsCache[playlist.uri]?.let { return@coroutineScope it }
+
+        val ids = playlist.contents
+            .map { it.attributes.addedBy }
+            .distinct()
+
+        val profiles = ids.map { id ->
+            async(Dispatchers.IO) {
+                _authors.value[id]?.let { return@async it }
+
+                val jsonRaw = try {
+                    userProfile.getUserProfile(id)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                } ?: return@async null
+
+                val profile = try {
+                    json.decodeFromString<Profile>(jsonRaw)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    return@async null
+                }
+
+                _authors.update { current -> current + (id to profile) }
+                profile
+            }
+        }.awaitAll()
+            .filterNotNull()
+
+        authorsCache[playlist.uri] = profiles
+        profiles
+    }
+
+    fun saveItem(uri: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!spClient.saveItems(arrayOf(uri))) {
+                Log.w("SearchViewModel", "saveItem failed")
+            }
+        }
+    }
+
+    fun isLiked(uri: OutifyUri): Flow<Boolean> {
+        val id = uri.id
+        return if (uri.isTrack) {
+            likedDao.observeIsTrackLiked(id)
+        } else {
+            likedDao.observeIsEpisodeLiked(id)
+        }
+    }
+
+    fun setAudio(audio: PlayableAudio) {
+        playbackStateHolder.setAudio(audio)
+    }
+
+    fun addToHistory(item: SearchUiModel) {
+        val historyItem = when (item) {
+            is SearchUiModel.TrackItem -> SearchHistoryItem(item.uri, SearchResultType.TRACK)
+            is SearchUiModel.ArtistItem -> SearchHistoryItem(item.uri, SearchResultType.ARTIST)
+            is SearchUiModel.AlbumItem -> SearchHistoryItem(item.uri, SearchResultType.ALBUM)
+            is SearchUiModel.PlaylistItem -> SearchHistoryItem(item.uri, SearchResultType.PLAYLIST)
+            is SearchUiModel.ShowItem -> SearchHistoryItem(item.uri, SearchResultType.SHOW)
+            is SearchUiModel.EpisodeItem -> SearchHistoryItem(item.uri, SearchResultType.EPISODE)
+            else -> return
+        }
+        viewModelScope.launch {
+            settingsRepository.addSearchHistoryItems(listOf(historyItem))
+        }
+    }
+
+    fun removeFromHistory(uri: String) {
+        viewModelScope.launch {
+            settingsRepository.removeSearchHistoryItem(uri)
+        }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            settingsRepository.clearSearchHistory()
+        }
+    }
+}
+
+sealed class SearchUiModel {
+    abstract val uri: String
+
+    data class SectionHeader(
+        @StringRes val titleRes: Int
+    ) : SearchUiModel() {
+        override val uri: String = "header_$titleRes"
+    }
+
+    data class SkeletonItem(
+        val id: Int
+    ) : SearchUiModel() {
+        override val uri: String = "skeleton_$id"
+    }
+
+    data class TrackItem(
+        override val uri: String,
+        val track: Track
+    ) : SearchUiModel()
+
+    data class ArtistItem(
+        override val uri: String,
+        val artist: Artist
+    ) : SearchUiModel()
+
+    data class AlbumItem(
+        override val uri: String,
+        val album: Album
+    ) : SearchUiModel()
+
+    data class PlaylistItem(
+        override val uri: String,
+        val playlist: Playlist
+    ) : SearchUiModel()
+
+    data class ShowItem(
+        override val uri: String,
+        val show: Show
+    ) : SearchUiModel()
+
+    data class EpisodeItem(
+        override val uri: String,
+        val episode: Episode
+    ) : SearchUiModel()
+}

@@ -15,7 +15,7 @@
     <string name="repeat_mode_off">반복 안 함</string>
     <string name="like">좋아요</string>
     <string name="outify_playback_widget_description">내가 좋아하는 곡을 빠르게 재생하는 방법</string>
-    <string name="homescreen_most_listened_disclaimer">이 데이터는 Spotify에서 가져온 것입니다. Outify는 회원님의 인기 아티스트나 곡을 추적하지 않으며, 이 데이터는 공식 Spotify 앱에서 가져온 정보입니다.</string>
+    <string name="homescreen_most_listened_disclaimer">이 데이터는 Spotify에서 가져온 것입니다. Musique는 회원님의 인기 아티스트나 곡을 추적하지 않으며, 이 데이터는 공식 Spotify 앱에서 가져온 정보입니다.</string>
     <string name="welcome_back">다시 오신 것을 환영합니다,\n%1$s님!</string>
     <string name="common_artwork">아트워크</string>
     <string name="common_scroll_to_top">맨 위로 스크롤</string>
@@ -114,7 +114,7 @@
     <string name="widget_adding">추가 중</string>
     <string name="widget_your_widgets">내 위젯</string>
     <string name="widget_none">홈화면에 위젯 없음</string>
-    <string name="widget_hint">먼저 홈 화면을 길게 눌러 Outify 위젯을 추가하세요.</string>
+    <string name="widget_hint">먼저 홈 화면을 길게 눌러 Musique 위젯을 추가하세요.</string>
     <string name="widget_name">위젯</string>
     <string name="widget_add_here">여기에 추가</string>
     <string name="widget_current_tracks">현재 곡 — 탭하여 삭제</string>
@@ -179,7 +179,7 @@
     <string name="liked_you_count">좋아요 표시한 곡이 %1$d곡 있습니다</string>
     <string name="album_song_count">%1$s • %2$d 곡</string>
     <string name="show_episode_count">%1$s • %2$d 에피소드</string>
-    <string name="title_with_app">%1$s - Outify</string>
+    <string name="title_with_app">%1$s - Musique</string>
     <string name="playlist_number">Playlist %1$d</string>
     <string name="liked_position">위치 #%1$d</string>
     <string name="error_format">에러: %1$s</string>
@@ -253,8 +253,8 @@
     <string name="search_loading_albums">앨범 로딩 중…</string>
     <string name="search_loading_shows">팟캐스트 로딩 중...</string>
     <string name="search_loading_episodes">에피소드 로딩 중…</string>
-    <string name="onb_playback_login_desc">Spotify Premium 구독이 필요합니다. 오디오를 스트리밍하려면 이 로그인이 필요합니다. Outify는 librespot과 익명 Spotify 인증 정보를 사용해 재생하며, 개인 계정과는 별개입니다.</string>
-    <string name="onb_stream_tracks">Outify에서 곡 스트리밍</string>
+    <string name="onb_playback_login_desc">Spotify Premium 구독이 필요합니다. 오디오를 스트리밍하려면 이 로그인이 필요합니다. Musique는 librespot과 익명 Spotify 인증 정보를 사용해 재생하며, 개인 계정과는 별개입니다.</string>
+    <string name="onb_stream_tracks">Musique에서 곡 스트리밍</string>
     <string name="onb_view_content">아티스트, 앨범, 플레이리스트 보기</string>
     <string name="onb_keep_synced">청취 기록을 동기화 상태로 유지</string>
     <string name="onb_playback_connected">재생 로그인 연결됨</string>
@@ -263,17 +263,17 @@
     <string name="onb_manage_playlists">플레이리스트 만들기 및 관리</string>
     <string name="onb_account_connected">계정 연결됨</string>
     <string name="onb_why_two">로그인이 두 번 필요한 이유</string>
-    <string name="onb_librespot_desc">Outify는 librespot으로 오디오를 스트리밍합니다. librespot은 익명 인증 정보로 Spotify 스트리밍 프로토콜에 인증하며, 사용자의 Spotify 계정과는 별개로 작동하고 개인 데이터에 접근할 수 없습니다.</string>
+    <string name="onb_librespot_desc">Musique는 librespot으로 오디오를 스트리밍합니다. librespot은 익명 인증 정보로 Spotify 스트리밍 프로토콜에 인증하며, 사용자의 Spotify 계정과는 별개로 작동하고 개인 데이터에 접근할 수 없습니다.</string>
     <string name="onb_oauth_desc">Spotify 계정 로그인은 별도로 OAuth를 통해 처리됩니다. 라이브러리, 플레이리스트, 소셜 기능에 대한 접근 권한을 부여하지만 오디오 스트리밍에는 관여하지 않습니다.</string>
     <string name="onb_premium_required">스포티파이 프리미엄이 필요합니다</string>
-    <string name="onb_premium_learn">Outify는 Spotify Premium 계정에서만 작동합니다. 이유를 알아보려면 탭하세요.</string>
+    <string name="onb_premium_learn">Musique는 Spotify Premium 계정에서만 작동합니다. 이유를 알아보려면 탭하세요.</string>
     <string name="onb_required_streaming">오디오 스트리밍에 필요합니다.</string>
     <string name="onb_anon_creds">librespot에 내장된 익명 인증 정보로 Spotify 스트리밍 프로토콜에 인증합니다. 개인 Spotify 계정과 연결되지 않습니다.</string>
     <string name="onb_real_account">실제 Spotify 계정을 OAuth로 연결합니다.</string>
     <string name="onb_features_by_login">로그인 상태에 따라 사용할 수 있는 기능:</string>
     <string name="onb_available_scopes">사용 가능한 권한 범위:</string>
     <string name="battery_title">음악 이어듣기</string>
-    <string name="battery_desc">Outify를 배터리 최적화에서 제외하면 백그라운드에서 재생과 동기화가 중단되지 않습니다.</string>
+    <string name="battery_desc">Musique를 배터리 최적화에서 제외하면 백그라운드에서 재생과 동기화가 중단되지 않습니다.</string>
     <string name="battery_action">배터리 최적화 사용 안 함</string>
     <string name="notif_permission_title">동기화 유지</string>
     <string name="notif_permission_desc">라이브러리 곡 동기화가 완료되면 알림을 받습니다.</string>
@@ -321,7 +321,7 @@
     <string name="settings_padding_desc">시스템 탐색이 표시될 공간을 남겨둡니다. 주로 버튼 탐색용입니다.</string>
     <string name="settings_appearance_track_theme_desc">현재 곡에 따라 바뀌는 색 구성</string>
     <string name="settings_appearance_system_theme_desc">시스템 색 구성에 맞춘 색 구성</string>
-    <string name="settings_appearance_accent_desc">Outify 인터페이스 색상</string>
+    <string name="settings_appearance_accent_desc">Musique 인터페이스 색상</string>
     <string name="settings_appearance_amoled">AMOLED black 사용하기</string>
     <string name="settings_appearance_monochrome">모든 이미지 흑백으로 표시하기</string>
     <string name="settings_mono_album_desc">앨범 화면의 앨범 아트워크가 흑백으로 표시됩니다</string>
@@ -345,7 +345,7 @@
     <string name="settings_resurrect_desc">알림에서 앱 복구 허용</string>
     <string name="settings_romanize_desc">원문 가사 아래에 로마자 표기 표시</string>
     <string name="settings_lyrics_fallback_desc">Spotify에 가사가 없을 때 lrclib.net에서 싱크 가사를 찾습니다. 곡 제목, 아티스트, 앨범, 길이를 LRCLIB에 전송합니다.</string>
-    <string name="settings_connect_desc">Outify를 스트리밍할 활성 기기로 설정</string>
+    <string name="settings_connect_desc">Musique를 스트리밍할 활성 기기로 설정</string>
     <string name="settings_playback_login_desc">재생을 허용하려면 이 로그인이 필수입니다. 가짜 Spotify 인증 정보를 사용해 오디오를 스트리밍합니다.</string>
     <string name="settings_account_login_desc">이 로그인으로 Spotify 계정을 조작할 수 있습니다. 곡 좋아요, 플레이리스트 만들기, 추천 이용, 라이브러리 관리가 가능합니다.</string>
     <string name="settings_librespot_creds">librespot · 익명 스트리밍 인증 정보</string>

@@ -12,7 +12,7 @@ use crate::session::with_session;
 
 // Checks for cached credentials. Does NOT use Session
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_AuthManager_hasCachedCredentials(
+pub extern "system" fn Java_app_musique_core_AuthManager_hasCachedCredentials(
     _env: JNIEnv,
     _this: JClass,
 ) -> jboolean {
@@ -29,7 +29,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_AuthManager_hasCachedCredential
 
 // Returns the auth URL for OAuth flow
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_AuthManager_getAuthorizationURL(
+pub extern "system" fn Java_app_musique_core_AuthManager_getAuthorizationURL(
     env: JNIEnv,
     _this: JObject,
 ) -> jstring {
@@ -71,7 +71,7 @@ pub extern "system" fn Java_cc_tomko_outify_core_AuthManager_getAuthorizationURL
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_core_AuthManager_handleOAuthCode(
+pub extern "system" fn Java_app_musique_core_AuthManager_handleOAuthCode(
     mut env: JNIEnv,
     _this: JObject,
     code: JString,
@@ -158,7 +158,7 @@ fn classify_oauth_error(err: &librespot_core::Error) -> &'static str {
     }
 }
 
-#[unsafe(export_name = "Java_cc_tomko_outify_core_AuthManager_logout")]
+#[unsafe(export_name = "Java_app_musique_core_AuthManager_logout")]
 pub extern "system" fn logout(_env: JNIEnv, _class: JClass) -> jboolean {
     let mut os_files_dir: PathBuf = crate::FILES_DIR
         .get()

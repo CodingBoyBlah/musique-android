@@ -15,7 +15,7 @@
     <string name="repeat_mode_all">Opakovat všechny</string>
     <string name="like">Oblíbené</string>
     <string name="outify_playback_widget_description">Rychlý způsob jak přehrát oblibené písně</string>
-    <string name="homescreen_most_listened_disclaimer">Data jsou získané ze Spotify. Outify nesleduje Vaše nehranější skladby a interprety, tímpadem tyto data jsou zaznamenány oficiálními Spotify aplikacemi.</string>
+    <string name="homescreen_most_listened_disclaimer">Data jsou získané ze Spotify. Musique nesleduje Vaše nehranější skladby a interprety, tímpadem tyto data jsou zaznamenány oficiálními Spotify aplikacemi.</string>
     <string name="welcome_back">Vítej zpět,\n%1$s!</string>
     <string name="homescreen_top_artists">Nejpřehrávanější interpreti</string>
     <string name="homescreen_top_tracks">Nejpřehrávanější skladby</string>
@@ -130,7 +130,7 @@
     <string name="widget_adding">Přidávám</string>
     <string name="widget_your_widgets">TVÉ WIDGETY</string>
     <string name="widget_none">Žádné widgety na domovské obrazovce</string>
-    <string name="widget_hint">První dlouze podrž na domovské obrazovce a přidej Outify widget.</string>
+    <string name="widget_hint">První dlouze podrž na domovské obrazovce a přidej Musique widget.</string>
     <string name="widget_name">Widget</string>
     <string name="widget_add_here">Přidat sem</string>
     <string name="widget_current_tracks">Aktuální skladby — odeber kliknutím</string>

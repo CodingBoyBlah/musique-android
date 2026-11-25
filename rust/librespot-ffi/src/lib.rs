@@ -64,7 +64,7 @@ pub extern "system" fn JNI_OnLoad(vm: JavaVM, _reserved: *mut std::os::raw::c_vo
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_cc_tomko_outify_LibrespotFfi_libInit(
+pub extern "system" fn Java_app_musique_LibrespotFfi_libInit(
     mut env: JNIEnv,
     _class: JClass,
     context: JObject,
