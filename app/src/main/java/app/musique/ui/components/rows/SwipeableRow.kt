@@ -61,6 +61,7 @@ fun SwipeableRowWithGestures(
     endGestures: List<SwipeGesture> = emptyList(),
     minIconSize: Dp = 14.dp,
     iconMaxSizeFraction: Float = 0.5f, // max icon size relative to content height
+    containerColor: Color = MaterialTheme.colorScheme.surface,
     content: @Composable () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -331,7 +332,7 @@ fun SwipeableRowWithGestures(
         ) {
             Surface(
                 tonalElevation = 0.dp,
-                color = MaterialTheme.colorScheme.surface
+                color = containerColor
             ) {
                 content()
             }
