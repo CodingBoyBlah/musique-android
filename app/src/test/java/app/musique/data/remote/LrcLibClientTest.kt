@@ -1,5 +1,6 @@
 package app.musique.data.remote
 
+import app.musique.core.model.LyricWord
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -18,6 +19,8 @@ class LrcParserTest {
         assertEquals(2, lines.size)
         assertEquals(12_340L, lines[0].timestampMs)
         assertEquals("First line", lines[0].text)
+        assertNull(lines[0].words)
+        assertTrue(lines[0].synced)
         assertEquals(62_500L, lines[1].timestampMs)
         assertEquals("Second line", lines[1].text)
     }
@@ -44,6 +47,52 @@ class LrcParserTest {
 
         assertEquals(listOf(1_000L, 3_000L), lines.map { it.timestampMs })
         assertTrue(lines.all { it.text == "Chorus" })
+    }
+
+    @Test
+    fun `parses enhanced lrc word tags and trailing end tag`() {
+        val lines = LrcParser.parseSynced(
+            "[00:12.00]<00:12.00>Hello <00:12.50>world <00:13.10>"
+        )
+
+        assertEquals(1, lines.size)
+        val line = lines.single()
+        assertEquals(12_000L, line.timestampMs)
+        assertEquals(13_100L, line.endMs)
+        assertEquals("Hello world", line.text)
+        assertEquals(
+            listOf(
+                LyricWord(12_000L, 12_500L, "Hello "),
+                LyricWord(12_500L, 13_100L, "world"),
+            ),
+            line.words
+        )
+    }
+
+    @Test
+    fun `parses enhanced lrc with prefix text before first inline tag and syllable tags`() {
+        val lines = LrcParser.parseSynced(
+            "[00:10.00]Hel<00:10.25>lo <00:10.60>world\n[00:11.00]Next"
+        )
+
+        assertEquals(2, lines.size)
+        assertEquals("Hello world", lines[0].text)
+        assertEquals(
+            listOf(
+                LyricWord(10_000L, 10_250L, "Hel"),
+                LyricWord(10_250L, 10_600L, "lo "),
+                LyricWord(10_600L, 11_000L, "world"),
+            ),
+            lines[0].words
+        )
+        assertNull(lines[1].words)
+    }
+
+    @Test
+    fun `skips enhanced lrc lines containing only tags and whitespace`() {
+        val lines = LrcParser.parseSynced("[00:15.00] <00:15.00>  ")
+
+        assertTrue(lines.isEmpty())
     }
 }
 

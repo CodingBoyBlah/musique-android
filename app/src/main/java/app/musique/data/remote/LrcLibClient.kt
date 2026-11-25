@@ -3,6 +3,7 @@ package app.musique.data.remote
 import android.util.Log
 import app.musique.BuildConfig
 import app.musique.core.model.LyricLine
+import app.musique.core.model.LyricWord
 import app.musique.core.model.Track
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -149,10 +150,19 @@ internal fun LrcLibTrack.syncedLines(): List<LyricLine> {
 }
 
 /**
- * Parses LRC text (`[mm:ss.xx]` or `[mm:ss.xxx]` prefixes, several per line allowed).
+ * Parses standard LRC (`[mm:ss.xx]` or `[mm:ss.xxx]`, several per line allowed)
+ * and enhanced LRC (`<mm:ss.xx>` inline word/syllable timestamps).
  */
 object LrcParser {
     private val timestamp = Regex("""\[(\d+):(\d{1,2})(?:[.:](\d{1,3}))?]""")
+    private val wordTimestamp = Regex("""<(\d+):(\d{1,2})(?:[.:](\d{1,3}))?>""")
+    private const val DEFAULT_WORD_DURATION_MS = 400L
+
+    private data class EnhancedBody(
+        val text: String,
+        val words: List<LyricWord>,
+        val endMs: Long?,
+    )
 
     fun parseSynced(text: String): List<LyricLine> {
         val lines = mutableListOf<LyricLine>()
@@ -160,25 +170,143 @@ object LrcParser {
             val stamps = timestamp.findAll(rawLine).toList()
             if (stamps.isEmpty()) return@forEach
 
-            val words = rawLine.substring(stamps.last().range.last + 1).trim()
-            if (words.isEmpty()) return@forEach
+            val body = rawLine.substring(stamps.last().range.last + 1).trim()
+            if (body.isEmpty()) return@forEach
 
-            stamps.forEach { match ->
-                val minutes = match.groupValues[1].toLong()
-                val seconds = match.groupValues[2].toLong()
-                val fraction = match.groupValues[3]
-                val millis = when (fraction.length) {
-                    0 -> 0L
-                    1 -> fraction.toLong() * 100
-                    2 -> fraction.toLong() * 10
-                    else -> fraction.take(3).toLong()
+            val stampTimes = stamps.map(::parseStampMs)
+            val wordMatches = wordTimestamp.findAll(body).toList()
+
+            if (wordMatches.isEmpty()) {
+                stampTimes.forEach { ts ->
+                    lines += LyricLine(
+                        timestampMs = ts,
+                        text = body,
+                        synced = true,
+                    )
                 }
+                return@forEach
+            }
+
+            val baseStamp = stampTimes.first()
+            val enhanced = parseEnhancedBody(body, baseStamp, wordMatches) ?: return@forEach
+
+            stampTimes.forEach { ts ->
+                val shift = ts - baseStamp
+                val shiftedWords = enhanced.words.map { word ->
+                    val start = (word.startMs + shift).coerceAtLeast(0L)
+                    val end = (word.endMs + shift).coerceAtLeast(start)
+                    LyricWord(startMs = start, endMs = end, text = word.text)
+                }
+                val shiftedEnd = enhanced.endMs?.let { (it + shift).coerceAtLeast(ts) }
                 lines += LyricLine(
-                    timestampMs = minutes * 60_000 + seconds * 1_000 + millis,
-                    text = words,
+                    timestampMs = ts,
+                    text = enhanced.text,
+                    endMs = shiftedEnd,
+                    words = shiftedWords,
+                    synced = true,
                 )
             }
         }
-        return lines.sortedBy { it.timestampMs }
+
+        val sorted = lines.sortedBy { it.timestampMs }
+        return sorted.mapIndexed { idx, line ->
+            val words = line.words
+            if (words.isNullOrEmpty() || line.endMs != null) {
+                line
+            } else {
+                val last = words.last()
+                val nextLineStart = sorted.getOrNull(idx + 1)?.timestampMs
+                val resolvedEnd = if (nextLineStart != null && nextLineStart > last.startMs) {
+                    minOf(nextLineStart, last.startMs + DEFAULT_WORD_DURATION_MS)
+                } else {
+                    last.startMs + DEFAULT_WORD_DURATION_MS
+                }
+                if (resolvedEnd == last.endMs) {
+                    line
+                } else {
+                    val updated = words.toMutableList()
+                    updated[updated.lastIndex] = last.copy(endMs = resolvedEnd)
+                    line.copy(words = updated)
+                }
+            }
+        }
+    }
+
+    private fun parseEnhancedBody(
+        body: String,
+        baseStampMs: Long,
+        matches: List<MatchResult>,
+    ): EnhancedBody? {
+        val rawSegments = mutableListOf<Pair<Long, String>>()
+        val prefix = body.substring(0, matches.first().range.first)
+        if (prefix.isNotBlank()) {
+            rawSegments += baseStampMs to prefix
+        }
+
+        var trailingEndMs: Long? = null
+        for (i in matches.indices) {
+            val startMs = parseStampMs(matches[i])
+            val segStart = matches[i].range.last + 1
+            val segEnd = if (i + 1 < matches.size) matches[i + 1].range.first else body.length
+            val slice = body.substring(segStart, segEnd)
+            if (slice.isEmpty() || slice.isBlank()) {
+                if (i == matches.lastIndex) {
+                    trailingEndMs = startMs
+                } else if (rawSegments.isNotEmpty() && slice.isNotEmpty()) {
+                    // Preserve a single separating space if a blank slice sat between tags.
+                    val (prevStart, prevText) = rawSegments.last()
+                    if (!prevText.last().isWhitespace()) {
+                        rawSegments[rawSegments.lastIndex] = prevStart to "$prevText "
+                    }
+                }
+            } else {
+                rawSegments += startMs to slice
+            }
+        }
+
+        if (rawSegments.isEmpty()) return null
+
+        val words = ArrayList<LyricWord>(rawSegments.size)
+        for (i in rawSegments.indices) {
+            val (startMs, rawText) = rawSegments[i]
+            var text = rawText
+            if (i == 0) {
+                text = text.trimStart()
+            } else if (words.isNotEmpty() && words.last().text.lastOrNull()?.isWhitespace() == true) {
+                text = text.trimStart()
+            }
+            if (i == rawSegments.lastIndex) {
+                text = text.trimEnd()
+            }
+            if (text.isEmpty()) continue
+
+            val nextStart = rawSegments.getOrNull(i + 1)?.first ?: trailingEndMs
+            val endMs = if (nextStart != null) {
+                maxOf(startMs, nextStart)
+            } else {
+                startMs + DEFAULT_WORD_DURATION_MS
+            }
+            words += LyricWord(startMs = startMs, endMs = endMs, text = text)
+        }
+
+        if (words.isEmpty()) return null
+        val cleanText = words.joinToString("") { it.text }.trim()
+        if (cleanText.isEmpty()) return null
+
+        val lineEndMs = trailingEndMs?.let { maxOf(it, words.last().endMs) }
+        return EnhancedBody(text = cleanText, words = words, endMs = lineEndMs)
+    }
+
+    private fun parseStampMs(match: MatchResult): Long {
+        val minutes = match.groupValues[1].toLong()
+        val seconds = match.groupValues[2].toLong()
+        val fraction = match.groupValues[3]
+        val millis = when (fraction.length) {
+            0 -> 0L
+            1 -> fraction.toLong() * 100
+            2 -> fraction.toLong() * 10
+            else -> fraction.take(3).toLong()
+        }
+        return minutes * 60_000 + seconds * 1_000 + millis
     }
 }
