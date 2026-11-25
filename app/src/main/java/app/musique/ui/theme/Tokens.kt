@@ -18,6 +18,7 @@ object MusiqueColors {
     val chrome = Color(0xFF232323)
     val chromeFloating = Color(0xF0232323)
     val chromeTranslucent = Color(0xD9232323)
+    val barTranslucent = Color(0xE0000000)
     val hairline = Color.White.copy(alpha = 0.08f)
     val glassEdge = Color.White.copy(alpha = 0.08f)
 
@@ -33,9 +34,14 @@ object MusiqueColors {
     val grabber = Color.White.copy(alpha = 0.42f)
     val pillSelected = Color.White
     val onPillSelected = Color(0xFF1C1714)
+    val fillSecondary = Color.White.copy(alpha = 0.18f)
+    val scrim = Color(0xE0000000)
+    val avatarPlaceholder = Color(0xFF4A4A4C)
+    val avatarPlaceholderIcon = Color(0xFF8E8E93)
 
     /** Apple Music / Cider rose, used when there is no artwork to take color from. */
     val accent = Color(0xFFFA2F48)
+    val onDarkPlay = Color(0xFF1A0A00)
 }
 
 object MusiqueShapes {
@@ -67,6 +73,8 @@ object MusiqueDimens {
     val miniPlayerGap = 8.dp
     val miniPlayerSideMargin = 16.dp
     val topBarHeight = 64.dp
+    val collapsedBarHeight = 56.dp
+    val hairlineWidth = 0.5.dp
     val roundButton = 40.dp
     val minTouchTarget = 44.dp
     val rowHeight = 56.dp
@@ -78,6 +86,16 @@ object MusiqueDimens {
     val queueArtSize = 48.dp
     val grabberWidth = 36.dp
     val grabberHeight = 4.dp
+    val rowArtworkSize = 48.dp
+    val cardSpacing = 12.dp
+    val sectionSpacing = 24.dp
+    val portraitCardWidth = 204.dp
+    val portraitCardHeight = 272.dp
+    val squareCardSize = 156.dp
+    val heroCardWidth = 184.dp
+    val heroCardHeight = 168.dp
+    val detailArtworkSize = 284.dp
+    val actionButtonHeight = 52.dp
 
     /** Height occupied by the floating tab bar plus its bottom gap above the gesture inset. */
     val tabBarTotalHeight = navBarBottomGap + navBarHeight

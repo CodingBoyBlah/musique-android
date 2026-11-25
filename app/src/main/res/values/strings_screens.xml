@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_title">Home</string>
+    <string name="home_top_picks">Top Picks for You</string>
+    <string name="home_recently_played">Recently Played</string>
+    <string name="home_eyebrow_made_for_you">Made for You</string>
+    <string name="home_eyebrow_more_like">More Like</string>
+    <string name="home_see_all">See All</string>
+
+    <string name="library_title">Library</string>
+    <string name="library_cat_playlists">Playlists</string>
+    <string name="library_cat_artists">Artists</string>
+    <string name="library_cat_albums">Albums</string>
+    <string name="library_cat_songs">Songs</string>
+    <string name="library_cat_podcasts">Podcasts</string>
+    <string name="library_cat_episodes">Episodes</string>
+    <string name="library_recently_added">Recently Added</string>
+    <string name="library_new_playlist">New Playlist</string>
+    <string name="library_new_folder">New Folder</string>
+    <string name="library_folders">Folders</string>
+    <string name="library_edit_folder">Edit folder</string>
+    <string name="library_move_to_folder">Move to folder</string>
+    <string name="library_collapse">Collapse</string>
+    <string name="library_expand">Expand</string>
+    <string name="library_playlists_empty">Your playlist library is empty</string>
+    <string name="library_playlists_no_match">No matching playlists found</string>
+    <string name="library_albums_empty">No saved albums yet</string>
+    <string name="library_albums_no_match">No matching albums found</string>
+    <string name="library_artists_empty">Saved albums and playlists will surface your artists here</string>
+    <string name="library_artists_no_match">No matching artists found</string>
+    <string name="library_shows_empty">No saved shows yet</string>
+    <string name="library_shows_no_match">No matching shows found</string>
+    <string name="library_episodes_empty">No saved episodes yet</string>
+    <string name="library_episodes_no_match">No matching episodes found</string>
+    <string name="library_search_artists">Search artists...</string>
+
+    <string name="search_placeholder">Artists, Songs, Lyrics, and More</string>
+    <string name="search_browse_categories">Browse Categories</string>
+    <string name="search_recent">Recent Searches</string>
+    <string name="search_top_result">Top Result</string>
+    <string name="search_scope_all">Catalog</string>
+    <string name="search_scope_library">Your Library</string>
+    <string name="search_filter_top_results">All</string>
+    <string name="search_cat_chill">Chill</string>
+    <string name="search_cat_focus">Focus</string>
+    <string name="search_cat_workout">Workout</string>
+    <string name="search_cat_indie">Indie</string>
+    <string name="search_cat_hiphop">Hip-Hop</string>
+    <string name="search_cat_pop">Pop</string>
+    <string name="search_cat_electronic">Electronic</string>
+    <string name="search_cat_rock">Rock</string>
+    <string name="search_cat_jazz">Jazz</string>
+    <string name="search_cat_late_night">Late Night</string>
+
+    <string name="detail_saved">Saved</string>
+    <string name="detail_more">More</string>
+    <string name="detail_shuffle">Shuffle</string>
+    <string name="detail_play">Play</string>
+    <string name="detail_unknown_creator">Spotify</string>
+    <string name="detail_playlist_type">Playlist</string>
+    <string name="detail_album_type">Album</string>
+    <string name="detail_song_count_singular">%1$d song</string>
+    <string name="detail_song_count_plural">%1$d songs</string>
+    <string name="detail_episode_count_singular">%1$d episode</string>
+    <string name="detail_episode_count_plural">%1$d episodes</string>
+    <string name="detail_runtime_minutes">%1$d min</string>
+    <string name="detail_runtime_hours_minutes">%1$d hr %2$d min</string>
+    <string name="detail_release_footer">%1$s · %2$s · %3$s</string>
+    <string name="detail_count_runtime_footer">%1$s · %2$s</string>
+
+    <string name="artist_latest_release">Latest Release</string>
+    <string name="artist_top_songs">Top Songs</string>
+    <string name="artist_albums">Albums</string>
+    <string name="artist_singles_eps">Singles &amp; EPs</string>
+    <string name="artist_liked_by_you">Liked by You</string>
+
+    <string name="cd_more_options">More options</string>
+    <string name="cd_play_item">Play</string>
+    <string name="cd_search_clear">Clear</string>
+</resources>
