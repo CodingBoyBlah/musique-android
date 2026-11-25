@@ -86,7 +86,12 @@ import app.musique.data.setting.LocalSwipeGestureSettings
 import app.musique.data.setting.LocalUiSettings
 import app.musique.ui.GlobalPopupController
 import app.musique.ui.Haptics
-import app.musique.ui.OutifyTheme
+import app.musique.ALBUM_COVER_URL
+import app.musique.core.model.CoverSize
+import app.musique.core.model.getCover
+import app.musique.ui.MusiqueTheme
+import app.musique.ui.theme.LocalNowPlayingPalette
+import app.musique.ui.theme.rememberArtworkPalette
 import app.musique.ui.PopupSpec
 import app.musique.ui.ThemeMode
 import app.musique.ui.components.GlobalPopupHost
@@ -346,7 +351,11 @@ class MainActivity : ComponentActivity() {
         val onboardingViewModel: OnboardingViewModel = hiltViewModel()
         val onboardingComplete by onboardingViewModel.isComplete.collectAsStateWithLifecycle()
 
-        OutifyTheme(
+        val nowPlayingPalette = rememberArtworkPalette(
+            currentAudio?.getCover(CoverSize.SMALL)?.let { ALBUM_COVER_URL + it.uri }
+        )
+
+        MusiqueTheme(
             audio = currentAudio,
             themeMode = themeMode,
             staticAccentColor = interfaceSettings.accentColor,
@@ -366,6 +375,7 @@ class MainActivity : ComponentActivity() {
                                 LocalEpisodeSwipeActionHandler provides viewModel.episodeSwipeActionHandler,
                                 LocalSwipeActionHandler provides viewModel.swipeActionHandler,
                                 LocalUiSettings provides interfaceSettings,
+                                LocalNowPlayingPalette provides nowPlayingPalette,
                             ) {
                                 Scaffold { innerPadding ->
                                     val context = LocalContext.current

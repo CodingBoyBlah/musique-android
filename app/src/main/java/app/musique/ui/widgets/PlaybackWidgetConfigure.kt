@@ -12,7 +12,7 @@ import androidx.compose.runtime.getValue
 import app.musique.MainActivity.MainActivity.LocalSharedTransitionScope
 import app.musique.data.dao.PlaylistDao
 import app.musique.data.repository.InterfaceSettings
-import app.musique.ui.OutifyTheme
+import app.musique.ui.MusiqueTheme
 import app.musique.ui.ThemeMode
 import app.musique.ui.viewmodel.widgets.PlaybackConfigureViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -50,7 +50,7 @@ class PlaybackWidgetConfigure : ComponentActivity() {
             val themeMode =
                 if (interfaceSettings.dynamicTheme) ThemeMode.DYNAMIC_ALBUM else if (interfaceSettings.dynamicSystem) ThemeMode.DYNAMIC_SYSTEM else ThemeMode.STATIC
 
-            OutifyTheme(
+            MusiqueTheme(
                 audio = currentTrack,
                 themeMode = themeMode,
                 staticAccentColor = interfaceSettings.accentColor,

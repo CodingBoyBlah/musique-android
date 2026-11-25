@@ -31,6 +31,8 @@ import app.musique.ALBUM_COVER_URL
 import app.musique.core.model.CoverSize
 import app.musique.core.model.PlayableAudio
 import app.musique.core.model.getCover
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.musiqueTypography
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
@@ -45,7 +47,7 @@ val DefaultThemeColor = Color(0xFF465D69)
 @OptIn(UnstableApi::class)
 @SuppressLint("RestrictedApi")
 @Composable
-fun OutifyTheme(
+fun MusiqueTheme(
     audio: PlayableAudio?,
     themeMode: ThemeMode = ThemeMode.DYNAMIC_ALBUM,
     staticAccentColor: Color = DefaultThemeColor,
@@ -126,7 +128,7 @@ fun OutifyTheme(
         }
 
     val animatedScheme = animateColorScheme(
-        target = colorScheme,
+        target = if (darkTheme) colorScheme.musiqueDark() else colorScheme,
         animationSpec = tween(
             durationMillis = 600,
             easing = FastOutSlowInEasing
@@ -134,7 +136,7 @@ fun OutifyTheme(
     )
     MaterialTheme(
         colorScheme = animatedScheme,
-        typography = MaterialTheme.typography,
+        typography = musiqueTypography(),
         content = content
     )
 }
@@ -217,6 +219,27 @@ fun DynamicScheme.toColorScheme() = ColorScheme(
     tertiaryFixedDim = Color(tertiaryFixedDim),
     onTertiaryFixed = Color(onTertiaryFixed),
     onTertiaryFixedVariant = Color(onTertiaryFixedVariant),
+)
+
+/**
+ * Cider / Apple Music dark surfaces: pure black canvas, neutral charcoal containers.
+ * The accent roles keep their artwork or wallpaper tint.
+ */
+fun ColorScheme.musiqueDark() = copy(
+    background = MusiqueColors.canvas,
+    surface = MusiqueColors.canvas,
+    surfaceDim = MusiqueColors.canvas,
+    surfaceBright = MusiqueColors.chrome,
+    surfaceContainerLowest = MusiqueColors.canvas,
+    surfaceContainerLow = Color(0xFF0E0E0E),
+    surfaceContainer = MusiqueColors.card,
+    surfaceContainerHigh = MusiqueColors.cardRaised,
+    surfaceContainerHighest = MusiqueColors.chrome,
+    surfaceVariant = MusiqueColors.chrome,
+    onBackground = MusiqueColors.textPrimary,
+    onSurface = MusiqueColors.textPrimary,
+    onSurfaceVariant = MusiqueColors.textSecondary,
+    outlineVariant = MusiqueColors.hairline,
 )
 
 fun ColorScheme.pureBlack(apply: Boolean) =
