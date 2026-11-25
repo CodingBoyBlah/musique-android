@@ -1,0 +1,132 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  librespot:
+    name: librespot (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - abi: arm64-v8a
+            triple: aarch64-linux-android
+          - abi: armeabi-v7a
+            triple: armv7-linux-androideabi
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up NDK r29
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r29
+          add-to-path: false
+
+      - name: Install pinned Rust toolchain
+        working-directory: rust
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.triple }}
+
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> target
+          key: ${{ matrix.abi }}
+
+      - name: Build librespot-ffi
+        working-directory: rust/librespot-ffi
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: cargo ndk -t ${{ matrix.abi }} --platform 26 build --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: librespot-${{ matrix.abi }}
+          path: rust/target/${{ matrix.triple }}/release/liblibrespot_ffi.so
+          if-no-files-found: error
+
+  android:
+    name: APK
+    runs-on: ubuntu-latest
+    needs: librespot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: librespot-arm64-v8a
+          path: app/src/main/jniLibs/arm64-v8a
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: librespot-armeabi-v7a
+          path: app/src/main/jniLibs/armeabi-v7a
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          else
+            echo "No signing key configured, release APK falls back to the debug key"
+          fi
+
+      - name: Build release APKs
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+        run: ./gradlew assembleRelease --no-configuration-cache
+
+      - name: Name APKs
+        run: |
+          cd app/build/outputs/apk/release
+          for f in *.apk; do mv "$f" "musique-${f#app-}"; done
+          ls -la
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musique-apks
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
