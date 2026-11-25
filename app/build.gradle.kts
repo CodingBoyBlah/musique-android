@@ -24,20 +24,20 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
-val majorVersion = 2
+val majorVersion = 0
 val minorVersion = 1
 val patchVersion = 0
 
 extensions.configure<ApplicationExtension>("android") {
     compileSdk = 37
-    namespace = "cc.tomko.outify"
+    namespace = "app.musique"
 
     buildFeatures {
         buildConfig = true
     }
 
     defaultConfig {
-        applicationId = "cc.tomko.outify"
+        applicationId = "app.musique"
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -47,7 +47,7 @@ extensions.configure<ApplicationExtension>("android") {
         buildConfigField(
             "String",
             "SPOTIFY_CLIENT_ID",
-            "\"${keystoreProps.getProperty("spotify.playback.clientId", "")}\""
+            "\"${keystoreProps.getProperty("spotify.playback.clientId") ?: System.getenv("SPOTIFY_CLIENT_ID") ?: ""}\""
         )
         buildConfigField(
             "String",
