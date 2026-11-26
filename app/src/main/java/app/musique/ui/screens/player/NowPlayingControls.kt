@@ -34,8 +34,8 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Pause
@@ -129,7 +129,7 @@ internal fun PlayerIconButton(
     }
 }
 
-/** Heart that pops when it flips, like Apple's favorite star. */
+/** Favorite star that pops when it flips, like Cider and Apple Music. */
 @Composable
 internal fun FavoriteButton(
     isLiked: Boolean,
@@ -149,7 +149,7 @@ internal fun FavoriteButton(
         pop.animateTo(1f, MusiqueMotion.press())
     }
     PlayerIconButton(
-        icon = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+        icon = if (isLiked) Icons.Rounded.Star else Icons.Rounded.StarBorder,
         contentDescription = stringResource(R.string.cd_favorite),
         onClick = onToggle,
         tint = if (isLiked) palette.accent else MusiqueColors.textPrimary.copy(alpha = 0.85f),
