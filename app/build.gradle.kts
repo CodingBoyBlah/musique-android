@@ -24,9 +24,17 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
-val majorVersion = 0
-val minorVersion = 1
-val patchVersion = 0
+// Bump these for a release, then push a matching tag (v0.2.0). A tag build takes its version from
+// the tag so the in-app updater always compares against what GitHub Releases publishes.
+val baseVersion = "0.1.0"
+val tagVersion = System.getenv("GITHUB_REF_NAME")
+    ?.takeIf { System.getenv("GITHUB_REF_TYPE") == "tag" && it.startsWith("v") }
+    ?.removePrefix("v")
+val appVersion = tagVersion ?: baseVersion
+val versionParts = appVersion.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+val majorVersion = versionParts.getOrElse(0) { 0 }
+val minorVersion = versionParts.getOrElse(1) { 0 }
+val patchVersion = versionParts.getOrElse(2) { 0 }
 
 extensions.configure<ApplicationExtension>("android") {
     compileSdk = 37
@@ -42,7 +50,7 @@ extensions.configure<ApplicationExtension>("android") {
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = majorVersion * 10_000 + minorVersion * 100 + patchVersion
-        versionName = "$majorVersion.$minorVersion.$patchVersion"
+        versionName = appVersion
 
         buildConfigField(
             "String",
