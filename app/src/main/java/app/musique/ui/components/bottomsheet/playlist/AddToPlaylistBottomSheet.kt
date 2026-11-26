@@ -1,5 +1,9 @@
 package app.musique.ui.components.bottomsheet.playlist
 
+import app.musique.ui.components.bottomsheet.*
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
+import androidx.compose.foundation.background
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -117,17 +121,9 @@ fun AddToPlaylistBottomSheet(
 
                 // Action buttons
                 if (tracks.size == 1) {
-                    Text(
-                        text = stringResource(R.string.queue_your_playlists),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    SheetSectionLabel(stringResource(R.string.queue_your_playlists))
                 } else {
-                    Text(
-                        text = stringResource(R.string.count_tracks, tracks.size),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    SheetSectionLabel(stringResource(R.string.count_tracks, tracks.size))
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -138,7 +134,7 @@ fun AddToPlaylistBottomSheet(
                         .fillMaxWidth()
                         .weight(1f, fill = false),
                     contentPadding = PaddingValues(vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     items(
                         items = playlists,
@@ -185,7 +181,6 @@ fun TrackInfoHeader(tracks: List<Track>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
     ) {
         if (tracks.size == 1) {
             val track = tracks.first()
@@ -213,8 +208,7 @@ fun TrackInfoHeader(tracks: List<Track>) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = track.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MusiqueType.cardTitle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -286,105 +280,66 @@ private fun PlaylistItem(
     onAddClick: () -> Unit,
     onRemoveClick: () -> Unit,
 ) {
-    Card(
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isInPlaylist)
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-            else
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
-        ListItem(
-            modifier = Modifier.clickable {
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(interactionSource = interaction, indication = null) {
                 if (isInPlaylist) onRemoveClick() else onAddClick()
-            },
-            headlineContent = {
-                Text(
-                    text = playlistName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            supportingContent = {
-                Text(
-                    text = if (isInPlaylist) "$existingCount track${if (existingCount > 1) "s" else ""} in playlist" else "$trackCount tracks",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            leadingContent = {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+            }
+            .padding(vertical = 6.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(52.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MusiqueSheetDefaults.groupColor)
+        ) {
+            if (!artworkUrl.isNullOrBlank()) {
+                SmartImage(
+                    url = artworkUrl,
+                    contentDescription = null,
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    if (!artworkUrl.isNullOrBlank()) {
-                        SmartImage(
-                            url = artworkUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            monochrome = LocalUiSettings.current.monochromeImages
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            },
-            trailingContent = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (!isInPlaylist) {
-                        FilledTonalButton(
-                            onClick = onAddClick,
-                            modifier = Modifier.height(36.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = stringResource(R.string.common_add),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.common_add), style = MaterialTheme.typography.labelMedium)
-                        }
-                    } else {
-                        Button(
-                            onClick = onRemoveClick,
-                            modifier = Modifier.height(36.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Remove,
-                                contentDescription = stringResource(R.string.common_remove),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.common_remove), style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
-                }
-            },
-            colors = ListItemDefaults.colors(
-                containerColor = androidx.compose.ui.graphics.Color.Transparent
+                    modifier = Modifier.fillMaxSize(),
+                    monochrome = LocalUiSettings.current.monochromeImages
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                    contentDescription = null,
+                    tint = MusiqueColors.textTertiary
+                )
+            }
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = playlistName,
+                style = MusiqueType.rowTitle,
+                color = MusiqueColors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+            Text(
+                text = if (isInPlaylist) "$existingCount track${if (existingCount > 1) "s" else ""} in playlist" else "$trackCount tracks",
+                style = MusiqueType.rowSubtitle,
+                color = MusiqueColors.textTertiary,
+                maxLines = 1
+            )
+        }
+
+        Spacer(Modifier.width(8.dp))
+
+        SheetRoundButton(
+            icon = if (isInPlaylist) Icons.Default.Remove else Icons.Default.Add,
+            contentDescription = stringResource(if (isInPlaylist) R.string.common_remove else R.string.common_add),
+            tint = if (isInPlaylist) MusiqueSheetDefaults.destructive else MaterialTheme.colorScheme.primary,
+            onClick = { if (isInPlaylist) onRemoveClick() else onAddClick() }
         )
     }
 }

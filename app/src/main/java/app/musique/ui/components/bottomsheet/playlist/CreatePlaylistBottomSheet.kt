@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.playlist
 
+import app.musique.ui.components.bottomsheet.*
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
@@ -104,99 +105,46 @@ fun CreatePlaylistBottomSheet(
         sheetState = sheetState,
         modifier = modifier,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        SheetContent(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            spacing = 16.dp
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.PlaylistAdd,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .clip(MaterialShapes.Cookie9Sided.toShape())
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(12.dp)
-                        .size(20.dp)
+            SheetTitle(
+                text = if (isEditMode) stringResource(R.string.createplaylist_edit_title)
+                else stringResource(R.string.createplaylist_create_title)
+            )
+
+            SheetActionGroup {
+                SheetTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = stringResource(R.string.playlist_name),
                 )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = if (isEditMode) stringResource(R.string.createplaylist_edit_title) else stringResource(R.string.createplaylist_create_title),
-                    style = MaterialTheme.typography.headlineMediumEmphasized,
-                    fontWeight = FontWeight.Black,
+                SheetDivider()
+                SheetTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    placeholder = stringResource(R.string.playlist_desc_optional),
+                    singleLine = false,
+                    maxLines = 3,
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(R.string.playlist_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text(stringResource(R.string.playlist_desc_optional)) },
-                maxLines = 3,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.playlist_public),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        text = if (isPublic) "Anyone can see this playlist" else "Only you can see this playlist",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
+            SheetActionGroup {
+                SheetSwitchRow(
+                    label = stringResource(R.string.playlist_public),
+                    supportingText = stringResource(
+                        if (isPublic) R.string.sheet_playlist_public_desc
+                        else R.string.sheet_playlist_private_desc
+                    ),
                     checked = isPublic,
                     onCheckedChange = { isPublic = it },
                     enabled = !isCollaborative,
                 )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.playlist_collaborative),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    Text(
-                        text = stringResource(R.string.playlist_others),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
+                SheetDivider()
+                SheetSwitchRow(
+                    label = stringResource(R.string.playlist_collaborative),
+                    supportingText = stringResource(R.string.playlist_others),
                     checked = isCollaborative,
                     onCheckedChange = { collaborative ->
                         isCollaborative = collaborative
@@ -205,60 +153,44 @@ fun CreatePlaylistBottomSheet(
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = {
+            SheetButtonRow(
+                primaryText = when {
+                    isSaving && isEditMode -> stringResource(R.string.createplaylist_saving)
+                    isSaving -> stringResource(R.string.createplaylist_creating)
+                    isEditMode -> stringResource(R.string.common_save)
+                    else -> stringResource(R.string.common_create)
+                },
+                primaryEnabled = name.isNotBlank() && !isSaving,
+                onPrimary = {
+                    isSaving = true
+                    if (isEditMode) {
+                        viewModel.modifyPlaylist(
+                            playlistId = playlistId,
+                            name = name.trim(),
+                            description = description.trim().ifEmpty { "" },
+                            isPublic = isPublic,
+                            isCollaborative = isCollaborative,
+                        )
+                    } else {
+                        viewModel.createPlaylist(
+                            name = name.trim(),
+                            description = description.trim().ifEmpty { "" },
+                            isPublic = isPublic,
+                            isCollaborative = isCollaborative,
+                        )
+                    }
+                },
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = {
+                    if (!isSaving) {
                         coroutineScope.launch {
                             sheetState.hide()
                             onDismiss()
                         }
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = !isSaving,
-                ) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-
-                Button(
-                    onClick = {
-                        isSaving = true
-                        if (isEditMode) {
-                            viewModel.modifyPlaylist(
-                                playlistId = playlistId,
-                                name = name.trim(),
-                                description = description.trim().ifEmpty { "" },
-                                isPublic = isPublic,
-                                isCollaborative = isCollaborative,
-                            )
-                        } else {
-                            viewModel.createPlaylist(
-                                name = name.trim(),
-                                description = description.trim().ifEmpty { "" },
-                                isPublic = isPublic,
-                                isCollaborative = isCollaborative,
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = name.isNotBlank() && !isSaving,
-                ) {
-                    Text(
-                        when {
-                            isSaving && isEditMode -> stringResource(R.string.createplaylist_saving)
-                            isSaving -> stringResource(R.string.createplaylist_creating)
-                            isEditMode -> stringResource(R.string.common_save)
-                            else -> stringResource(R.string.common_create)
-                        }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
+                    }
+                },
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }
