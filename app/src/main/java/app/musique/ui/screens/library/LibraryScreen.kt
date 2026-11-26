@@ -1,13 +1,13 @@
 package app.musique.ui.screens.library
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -17,86 +17,102 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.CreateNewFolder
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.MicExternalOn
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Podcasts
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
-import app.musique.fabBottomPadding
+import app.musique.ALBUM_COVER_URL
 import app.musique.R
 import app.musique.ScreenBottomPadding
+import app.musique.core.model.Album
+import app.musique.core.model.Artist
+import app.musique.core.model.CoverSize
 import app.musique.core.model.Playlist
 import app.musique.core.model.PlaylistFolder
+import app.musique.core.model.Profile
+import app.musique.core.model.getCover
 import app.musique.core.model.toColor
 import app.musique.ui.GlobalPopupController
 import app.musique.ui.PopupSpec
-import app.musique.ui.components.ArtworkBackground
-import app.musique.ui.components.CollapsingHeader
 import app.musique.ui.components.ErrorScreen
 import app.musique.ui.components.bottomsheet.library.CreateFolderBottomSheet
 import app.musique.ui.components.bottomsheet.library.MoveToFolderBottomSheet
+import app.musique.ui.components.musique.AppleListRow
+import app.musique.ui.components.musique.CapsuleSearchField
+import app.musique.ui.components.musique.CategoryRow
+import app.musique.ui.components.musique.IconTile
+import app.musique.ui.components.musique.LargeTitleTopBar
+import app.musique.ui.components.musique.ListHairline
+import app.musique.ui.components.musique.RowMoreButton
+import app.musique.ui.components.musique.SectionHeader
+import app.musique.ui.components.musique.SquareCard
+import app.musique.ui.components.musique.TopBarIconButton
+import app.musique.ui.components.musique.rememberCollapseFraction
 import app.musique.ui.components.navigation.Route
-import app.musique.ui.components.navigation.popKeepingRoot
-import app.musique.ui.components.rememberCollapsingHeaderState
 import app.musique.ui.components.rows.AlbumRow
+import app.musique.ui.components.rows.ArtistRow
 import app.musique.ui.components.rows.PlaylistRow
 import app.musique.ui.components.rows.ShowRow
 import app.musique.ui.components.rows.SwipeableEpisodeRowConfigured
 import app.musique.ui.components.user.UserChipAvatar
-import app.musique.ui.screens.MaterialSearchBar
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueType
 import app.musique.ui.viewmodel.library.LibraryTab
 import app.musique.ui.viewmodel.library.LibraryViewModel
 import kotlinx.coroutines.launch
+
+/** Sub pages of the Library tab. Songs is not here: it opens [Route.LikedScreen]. */
+private enum class LibraryPage { Overview, Playlists, Artists, Albums, Podcasts }
 
 private sealed class LibraryItem {
     abstract val key: String
@@ -110,7 +126,20 @@ private sealed class LibraryItem {
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+/** One tile of the Recently Added grid. */
+private sealed class RecentItem {
+    abstract val key: String
+
+    data class PlaylistTile(val playlist: Playlist) : RecentItem() {
+        override val key get() = "recent_playlist:${playlist.uri}"
+    }
+
+    data class AlbumTile(val album: Album) : RecentItem() {
+        override val key get() = "recent_album:${album.uri}"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SharedTransitionScope.LibraryScreen(
     viewModel: LibraryViewModel,
@@ -118,11 +147,26 @@ fun SharedTransitionScope.LibraryScreen(
     modifier: Modifier = Modifier,
 ) {
     val libraryState by viewModel.libraryState.collectAsState()
-    val currentAudio by viewModel.currentAudio.collectAsState(initial = null)
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    LaunchedEffect(Unit) { viewModel.loadPlaylistUris() }
+    LaunchedEffect(Unit) {
+        viewModel.loadPlaylistUris()
+        // Albums feed the Recently Added grid and the Artists list.
+        viewModel.loadAlbumUris()
+    }
 
-    if (libraryState.error != null && libraryState.playlists.isEmpty() && libraryState.selectedTab == LibraryTab.Playlists) {
+    var page by rememberSaveable { mutableStateOf(LibraryPage.Overview) }
+    BackHandler(enabled = page != LibraryPage.Overview) { page = LibraryPage.Overview }
+
+    var showCreateFolder by remember { mutableStateOf(false) }
+    var editingFolder by remember { mutableStateOf<PlaylistFolder?>(null) }
+    var movePlaylistUri by remember { mutableStateOf<String?>(null) }
+    var moveCurrentFolderId by remember { mutableStateOf<String?>(null) }
+    var deleteFolderId by remember { mutableStateOf<String?>(null) }
+
+    if (libraryState.error != null && libraryState.playlists.isEmpty() &&
+        (page == LibraryPage.Overview || page == LibraryPage.Playlists)
+    ) {
         ErrorScreen(
             message = libraryState.error!!,
             onRetry = { viewModel.retry() },
@@ -131,470 +175,55 @@ fun SharedTransitionScope.LibraryScreen(
         return
     }
 
-    val density = LocalDensity.current
-    var searchQuery by remember { mutableStateOf("") }
-    val lazyListState = rememberLazyListState()
-    val collapsingState = rememberCollapsingHeaderState()
-
-    val atTop by remember {
-        derivedStateOf {
-            lazyListState.firstVisibleItemIndex == 0 &&
-                    lazyListState.firstVisibleItemScrollOffset == 0
-        }
-    }
-    SideEffect { collapsingState.canExpand = atTop }
-
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
-    val scope = rememberCoroutineScope()
-
-    val isScrolled by remember {
-        derivedStateOf {
-            lazyListState.firstVisibleItemIndex > 1 ||
-                    lazyListState.firstVisibleItemScrollOffset > 50
-        }
-    }
-    val showScrollToTop = isScrolled
-
-    var expandedFolderIds by remember { mutableStateOf(setOf<String>()) }
-    var showCreateFolder by remember { mutableStateOf(false) }
-    var editingFolder by remember { mutableStateOf<PlaylistFolder?>(null) }
-    var showMoveToFolder by remember { mutableStateOf(false) }
-    var movePlaylistUri by remember { mutableStateOf<String?>(null) }
-    var moveCurrentFolderId by remember { mutableStateOf<String?>(null) }
-    var deleteFolderId by remember { mutableStateOf<String?>(null) }
-
-    val selectedTab = libraryState.selectedTab
-
-    val filteredPlaylists = remember(libraryState.playlists, searchQuery) {
-        if (searchQuery.isBlank()) libraryState.playlists
-        else libraryState.playlists.filter { p ->
-            p.attributes.name.contains(searchQuery, ignoreCase = true) ||
-                    p.ownerUsername.contains(searchQuery, ignoreCase = true)
-        }
-    }
-
-    val filteredAlbums = remember(libraryState.albums, searchQuery) {
-        if (searchQuery.isBlank()) libraryState.albums
-        else libraryState.albums.filter { a ->
-            a.name.contains(searchQuery, ignoreCase = true)
-        }
-    }
-
-    val filteredShows = remember(libraryState.shows, searchQuery) {
-        if (searchQuery.isBlank()) libraryState.shows
-        else libraryState.shows.filter { s ->
-            s.name.contains(searchQuery, ignoreCase = true)
-        }
-    }
-
-    val filteredEpisodes = remember(libraryState.episodes, searchQuery) {
-        if (searchQuery.isBlank()) libraryState.episodes
-        else libraryState.episodes.filter { e ->
-            e.name.contains(searchQuery, ignoreCase = true) ||
-                    e.showName.contains(searchQuery, ignoreCase = true)
-        }
-    }
-
-    val flatItems = remember(libraryState.folders, filteredPlaylists, expandedFolderIds) {
-        buildFlatList(libraryState.folders, filteredPlaylists, expandedFolderIds)
-    }
-
-    LaunchedEffect(lazyListState.isScrollInProgress) {
-        if (!lazyListState.isScrollInProgress) {
-            val canExpand = lazyListState.firstVisibleItemIndex == 0 &&
-                    lazyListState.firstVisibleItemScrollOffset == 0
-            collapsingState.snapIfNeeded(canExpand)
-        }
-    }
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = { viewModel.refresh() },
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(color = MaterialTheme.colorScheme.surface)
-            .nestedScroll(collapsingState.nestedScrollConnection)
+            .background(MusiqueColors.canvas)
     ) {
-        val topPadding = with(density) { collapsingState.height.value.toDp() }
-
-        LazyColumn(
-            state = lazyListState,
-            contentPadding = PaddingValues(top = topPadding, bottom = 80.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            item(key = "expressive_filter_bar") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                ) {
-                    LibraryExpressiveFilters(
-                        selectedTab = selectedTab,
-                        onTabSelected = { viewModel.selectTab(it) }
+        AnimatedContent(
+            targetState = page,
+            transitionSpec = {
+                val forward = targetState != LibraryPage.Overview
+                (slideInHorizontally { if (forward) it / 4 else -it / 4 } + fadeIn()) togetherWith
+                    (slideOutHorizontally { if (forward) -it / 4 else it / 4 } + fadeOut())
+            },
+            label = "libraryPage",
+        ) { current ->
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                when (current) {
+                    LibraryPage.Overview -> LibraryOverview(
+                        viewModel = viewModel,
+                        playlists = libraryState.playlists,
+                        albums = libraryState.albums,
+                        onOpenPage = { page = it },
+                        onOpenLiked = { backStack.add(Route.LikedScreen()) },
+                        onOpenPlaylist = { backStack.add(Route.PlaylistScreen(it)) },
+                        onOpenAlbum = { backStack.add(Route.AlbumScreen(it)) },
+                        onCreatePlaylist = { GlobalPopupController.show(PopupSpec.CreatePlaylist()) },
                     )
 
-                    MaterialSearchBar(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        isLoading = false,
-                        autoFocus = false,
-                        placeholderText = when (selectedTab) {
-                            LibraryTab.Playlists -> stringResource(R.string.search_library_playlists)
-                            LibraryTab.Albums -> stringResource(R.string.search_library_albums)
-                            LibraryTab.Shows -> stringResource(R.string.search_library_shows)
-                            LibraryTab.Episodes -> stringResource(R.string.search_library_episodes)
+                    else -> LibraryCategoryPage(
+                        page = current,
+                        viewModel = viewModel,
+                        backStack = backStack,
+                        onBack = { page = LibraryPage.Overview },
+                        onCreateFolder = { showCreateFolder = true },
+                        onEditFolder = { editingFolder = it },
+                        onDeleteFolder = { deleteFolderId = it.id },
+                        onMovePlaylist = { uri, folderId ->
+                            movePlaylistUri = uri
+                            moveCurrentFolderId = folderId
                         },
                     )
                 }
             }
-
-            when (selectedTab) {
-                LibraryTab.Playlists -> {
-                    if (flatItems.isEmpty()) {
-                        item(key = "playlists_empty") {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = if (searchQuery.isBlank()) "Your playlist library is empty" else "No matching playlists found",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    items(
-                        items = flatItems,
-                        key = { it.key },
-                        contentType = {
-                            when (it) {
-                                is LibraryItem.FolderHeader -> "folder_header"
-                                is LibraryItem.PlaylistRow -> if (it.folderId != null) "folder_playlist" else "unorg_playlist"
-                            }
-                        }
-                    ) { item ->
-                        when (item) {
-                            is LibraryItem.FolderHeader -> {
-                                FolderHeaderContent(
-                                    folder = item.folder,
-                                    isExpanded = item.isExpanded,
-                                    onToggleExpand = {
-                                        expandedFolderIds = if (item.isExpanded)
-                                            expandedFolderIds - item.folder.id
-                                        else
-                                            expandedFolderIds + item.folder.id
-                                    },
-                                    onEdit = { editingFolder = item.folder },
-                                    onDelete = { deleteFolderId = item.folder.id },
-                                )
-                            }
-
-                            is LibraryItem.PlaylistRow -> {
-                                PlaylistRowContent(
-                                    playlist = item.playlist,
-                                    folderId = item.folderId,
-                                    backStack = backStack,
-                                    viewModel = viewModel,
-                                    onMovePlaylist = { uri, fid ->
-                                        movePlaylistUri = uri
-                                        moveCurrentFolderId = fid
-                                        showMoveToFolder = true
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                LibraryTab.Albums -> {
-                    if (libraryState.isLoadingAlbums && filteredAlbums.isEmpty()) {
-                        item(key = "albums_loading") {
-                            Text(
-                                text = stringResource(R.string.search_loading_albums),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                            )
-                        }
-                    }
-
-                    if (!libraryState.isLoadingAlbums && filteredAlbums.isEmpty()) {
-                        item(key = "albums_empty") {
-                            Text(
-                                text = if (searchQuery.isBlank()) "No saved albums yet" else "No matching albums found",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                            )
-                        }
-                    }
-
-                    items(
-                        items = filteredAlbums,
-                        key = { it.uri },
-                        contentType = { "album" }
-                    ) { album ->
-                        Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                            AlbumRow(
-                                album = album,
-                                artworkUrl = album.covers.firstOrNull()?.let { cover ->
-                                    "https://i.scdn.co/image/${cover.uri}"
-                                },
-                                onRowClick = {
-                                    backStack.add(Route.AlbumScreen(album.uri))
-                                },
-                                modifier = Modifier.animateItem(),
-                            )
-                        }
-                    }
-                }
-
-                LibraryTab.Shows -> {
-                    if (libraryState.isLoadingShows && filteredShows.isEmpty()) {
-                        item(key = "shows_loading") {
-                            Text(
-                                text = stringResource(R.string.search_loading_shows),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                            )
-                        }
-                    }
-
-                    if (!libraryState.isLoadingShows && filteredShows.isEmpty()) {
-                        item(key = "shows_empty") {
-                            Text(
-                                text = if (searchQuery.isBlank()) "No saved shows yet" else "No matching shows found",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                            )
-                        }
-                    }
-
-                    items(
-                        items = filteredShows,
-                        key = { it.uri },
-                        contentType = { "show" }
-                    ) { show ->
-                        Box(modifier = Modifier.padding(horizontal = 4.dp)) {
-                            ShowRow(
-                                show = show,
-                                onRowClick = {
-                                    backStack.add(Route.ShowScreen(show.uri))
-                                },
-                                modifier = Modifier.animateItem(),
-                            )
-                        }
-                    }
-                }
-
-                LibraryTab.Episodes -> {
-                    if (libraryState.isLoadingEpisodes && filteredEpisodes.isEmpty()) {
-                        item(key = "episodes_loading") {
-                            Text(
-                                text = stringResource(R.string.search_loading_episodes),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                            )
-                        }
-                    }
-
-                    if (!libraryState.isLoadingEpisodes && filteredEpisodes.isEmpty()) {
-                        item(key = "episodes_empty") {
-                            Text(
-                                text = if (searchQuery.isBlank()) "No saved episodes yet" else "No matching episodes found",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
-                            )
-                        }
-                    }
-
-                    items(
-                        items = filteredEpisodes,
-                        key = { it.uri },
-                        contentType = { "episode" }
-                    ) { episode ->
-                        val showUri = episode.showUri.ifBlank {
-                            libraryState.episodeShowUris[episode.uri]
-                        } ?: ""
-                        SwipeableEpisodeRowConfigured(
-                            episode = episode,
-                            onRowClick = {
-                                viewModel.playEpisode(episode)
-                            },
-                            onArtworkClick = {
-                                if (showUri.isNotBlank()) {
-                                    backStack.add(Route.ShowScreen(showUri))
-                                } else {
-                                    scope.launch {
-                                        val details = viewModel.resolveEpisodeDetails(episode.id)
-                                        if (details != null && details.showUri.isNotBlank()) {
-                                            backStack.add(Route.ShowScreen(details.showUri))
-                                        }
-                                    }
-                                }
-                            },
-                            onShowNameClick = {
-                                if (showUri.isNotBlank()) {
-                                    backStack.add(Route.ShowScreen(showUri))
-                                } else {
-                                    scope.launch {
-                                        val details = viewModel.resolveEpisodeDetails(episode.id)
-                                        if (details != null && details.showUri.isNotBlank()) {
-                                            backStack.add(Route.ShowScreen(details.showUri))
-                                        }
-                                    }
-                                }
-                            },
-                            isLiked = true,
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .animateItem(),
-                        )
-                    }
-                }
-
-                else -> { /* Managed safety fallback for removed states */
-                }
-            }
-
-            item {
-                Spacer(Modifier.height(ScreenBottomPadding))
-            }
-        }
-
-        CollapsingHeader(
-            collapseFraction = collapsingState.collapseFraction,
-            headerHeight = topPadding,
-            onBackPressed = { backStack.popKeepingRoot() },
-            backgroundContent = {
-                var artworkUrl by viewModel.headerArtwork
-                LaunchedEffect(libraryState.playlists) {
-                    viewModel.loadHeaderArtwork(libraryState.playlists)
-                }
-                ArtworkBackground(
-                    artworkUrl = artworkUrl,
-                    fallback = { Icon(Icons.Default.LibraryMusic, contentDescription = null) }
-                )
-            },
-            titleContent = {
-                Text(
-                    text = stringResource(R.string.library_your_library),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = when (selectedTab) {
-                        LibraryTab.Playlists -> stringResource(R.string.account_playlist_count, libraryState.playlists.count())
-                        LibraryTab.Albums -> stringResource(R.string.account_album_count, libraryState.albums.count())
-                        LibraryTab.Shows -> stringResource(R.string.account_show_count, libraryState.shows.count())
-                        LibraryTab.Episodes -> stringResource(R.string.account_episode_count, libraryState.episodes.count())
-                    },
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-        )
-
-        // Expressive Actions (FABs) Layout Block
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomEnd
-        ) {
-            var fabExpanded by remember { mutableStateOf(false) }
-
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(end = 16.dp, bottom = fabBottomPadding(currentAudio != null))
-            ) {
-                AnimatedVisibility(
-                    visible = showScrollToTop,
-                    enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-                    exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
-                ) {
-                    FloatingActionButton(
-                        onClick = { scope.launch { lazyListState.animateScrollToItem(0) } },
-                        shape = CircleShape,
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.common_scroll_to_top))
-                    }
-                }
-
-                if (selectedTab == LibraryTab.Playlists) {
-                    AnimatedVisibility(visible = fabExpanded) {
-                        FloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                GlobalPopupController.show(PopupSpec.CreatePlaylist())
-                            },
-                            shape = CircleShape,
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.PlaylistAdd,
-                                contentDescription = stringResource(R.string.playlist_add)
-                            )
-                        }
-                    }
-
-                    AnimatedVisibility(visible = fabExpanded) {
-                        FloatingActionButton(
-                            onClick = {
-                                fabExpanded = false
-                                showCreateFolder = true
-                            },
-                            shape = CircleShape,
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.CreateNewFolder,
-                                contentDescription = stringResource(R.string.library_add_folder)
-                            )
-                        }
-                    }
-
-                    val cornerRadius by animateFloatAsState(
-                        targetValue = if (fabExpanded) 20f else 28f,
-                        animationSpec = tween(durationMillis = 250),
-                        label = "fab_corner"
-                    )
-
-                    FloatingActionButton(
-                        onClick = { fabExpanded = !fabExpanded },
-                        shape = RoundedCornerShape(cornerRadius.dp),
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        val rotation by animateFloatAsState(
-                            targetValue = if (fabExpanded) 45f else 0f,
-                            animationSpec = tween(durationMillis = 250),
-                            label = "fab_rotation"
-                        )
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = if (fabExpanded) "Close menu" else "Add item",
-                            modifier = Modifier.rotate(rotation)
-                        )
-                    }
-                }
-            }
         }
     }
 
-    // Sheet / Dialog Overlays Management
     if (showCreateFolder || editingFolder != null) {
         val folder = editingFolder
         CreateFolderBottomSheet(
@@ -612,18 +241,15 @@ fun SharedTransitionScope.LibraryScreen(
         )
     }
 
-    if (showMoveToFolder && movePlaylistUri != null) {
+    movePlaylistUri?.let { uri ->
         MoveToFolderBottomSheet(
             folders = libraryState.folders,
             currentFolderId = moveCurrentFolderId,
             onDismiss = {
-                showMoveToFolder = false
                 movePlaylistUri = null
                 moveCurrentFolderId = null
             },
-            onSelectFolder = { folderId ->
-                movePlaylistUri?.let { viewModel.movePlaylistToFolder(it, folderId) }
-            }
+            onSelectFolder = { folderId -> viewModel.movePlaylistToFolder(uri, folderId) }
         )
     }
 
@@ -632,9 +258,7 @@ fun SharedTransitionScope.LibraryScreen(
         AlertDialog(
             onDismissRequest = { deleteFolderId = null },
             title = { Text(stringResource(R.string.folder_delete)) },
-            text = {
-                Text(stringResource(R.string.folder_delete_confirm, folder?.name ?: ""))
-            },
+            text = { Text(stringResource(R.string.folder_delete_confirm, folder?.name ?: "")) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteFolder(folderId)
@@ -652,53 +276,491 @@ fun SharedTransitionScope.LibraryScreen(
     }
 }
 
-/**
- * Expressive Material 3 Filter Pills Layout
- * Replaces old-style heavy structural tabs with casual, dynamic contextual selection tags.
- */
+private fun topContentPadding(statusBar: Dp) = statusBar + MusiqueDimens.topBarHeight + 4.dp
+
 @Composable
-private fun LibraryExpressiveFilters(
-    selectedTab: LibraryTab,
-    onTabSelected: (LibraryTab) -> Unit,
+private fun LibraryOverview(
+    viewModel: LibraryViewModel,
+    playlists: List<Playlist>,
+    albums: List<Album>,
+    onOpenPage: (LibraryPage) -> Unit,
+    onOpenLiked: () -> Unit,
+    onOpenPlaylist: (String) -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    onCreatePlaylist: () -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val collapseFraction = rememberCollapseFraction(listState)
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val accent = MaterialTheme.colorScheme.primary
+
+    val recent = remember(playlists, albums) { buildRecentlyAdded(playlists, albums) }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(
+                top = topContentPadding(statusBar),
+                bottom = ScreenBottomPadding + 16.dp,
+            ),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            item(key = "categories") {
+                val categories = listOf(
+                    Triple(Icons.AutoMirrored.Rounded.QueueMusic, R.string.library_cat_playlists) { onOpenPage(LibraryPage.Playlists) },
+                    Triple(Icons.Rounded.MicExternalOn, R.string.library_cat_artists) { onOpenPage(LibraryPage.Artists) },
+                    Triple(Icons.Rounded.Album, R.string.library_cat_albums) { onOpenPage(LibraryPage.Albums) },
+                    Triple(Icons.Rounded.MusicNote, R.string.library_cat_songs, onOpenLiked),
+                    Triple(Icons.Rounded.Podcasts, R.string.library_cat_podcasts) { onOpenPage(LibraryPage.Podcasts) },
+                )
+                Column(Modifier.fillMaxWidth()) {
+                    categories.forEachIndexed { index, (icon, label, onClick) ->
+                        CategoryRow(
+                            icon = icon,
+                            label = stringResource(label),
+                            onClick = onClick,
+                            accentColor = accent,
+                        )
+                        if (index < categories.lastIndex) ListHairline()
+                    }
+                }
+            }
+
+            if (recent.isNotEmpty()) {
+                item(key = "recent_header") {
+                    SectionHeader(
+                        title = stringResource(R.string.library_recently_added),
+                        modifier = Modifier.padding(top = 28.dp, bottom = 14.dp),
+                    )
+                }
+                val rows = recent.chunked(2)
+                items(rows, key = { row -> row.joinToString("|") { it.key } }) { row ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = MusiqueDimens.screenPadding)
+                            .padding(bottom = 18.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        row.forEach { item ->
+                            RecentTile(
+                                item = item,
+                                viewModel = viewModel,
+                                onOpenPlaylist = onOpenPlaylist,
+                                onOpenAlbum = onOpenAlbum,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        LargeTitleTopBar(
+            title = stringResource(R.string.library_title),
+            collapseFraction = collapseFraction,
+            trailingContent = {
+                TopBarIconButton(
+                    icon = Icons.Rounded.Add,
+                    contentDescription = stringResource(R.string.library_new_playlist),
+                    onClick = onCreatePlaylist,
+                    tint = accent,
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun RecentTile(
+    item: RecentItem,
+    viewModel: LibraryViewModel,
+    onOpenPlaylist: (String) -> Unit,
+    onOpenAlbum: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when (item) {
+        is RecentItem.PlaylistTile -> {
+            val playlist = item.playlist
+            val artworkUrl by produceState<String?>(null, playlist.uri) {
+                value = viewModel.getArtworkUrl(playlist)
+            }
+            SquareCard(
+                title = playlist.attributes.name,
+                subtitle = stringResource(R.string.detail_playlist_type),
+                imageUrl = artworkUrl,
+                size = null,
+                onClick = { onOpenPlaylist(playlist.uri) },
+                onLongClick = { GlobalPopupController.show(PopupSpec.PlaylistInfo(playlist, artworkUrl)) },
+                modifier = modifier,
+            )
+        }
+
+        is RecentItem.AlbumTile -> {
+            val album = item.album
+            SquareCard(
+                title = album.name,
+                subtitle = album.artists.joinToString(", ") { it.name }
+                    .ifBlank { stringResource(R.string.detail_album_type) },
+                imageUrl = album.coverUrl(),
+                size = null,
+                onClick = { onOpenAlbum(album.uri) },
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SharedTransitionScope.LibraryCategoryPage(
+    page: LibraryPage,
+    viewModel: LibraryViewModel,
+    backStack: NavBackStack<NavKey>,
+    onBack: () -> Unit,
+    onCreateFolder: () -> Unit,
+    onEditFolder: (PlaylistFolder) -> Unit,
+    onDeleteFolder: (PlaylistFolder) -> Unit,
+    onMovePlaylist: (String, String?) -> Unit,
+) {
+    val libraryState by viewModel.libraryState.collectAsState()
+    val listState = rememberLazyListState()
+    val collapseFraction = rememberCollapseFraction(listState)
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val scope = rememberCoroutineScope()
+    val accent = MaterialTheme.colorScheme.primary
+
+    var query by rememberSaveable(page) { mutableStateOf("") }
+    var expandedFolderIds by remember { mutableStateOf(setOf<String>()) }
+    val libraryArtists = remember(libraryState.albums) { artistsFromAlbums(libraryState.albums) }
+
+    // Podcasts shows saved shows or saved episodes; the view model loads each on selection.
+    LaunchedEffect(page) {
+        if (page == LibraryPage.Podcasts) {
+            val tab = libraryState.selectedTab
+            viewModel.selectTab(if (tab == LibraryTab.Episodes) LibraryTab.Episodes else LibraryTab.Shows)
+        }
+    }
+    val podcastTab = if (libraryState.selectedTab == LibraryTab.Episodes) LibraryTab.Episodes else LibraryTab.Shows
+
+    val title = stringResource(
+        when (page) {
+            LibraryPage.Playlists -> R.string.library_cat_playlists
+            LibraryPage.Artists -> R.string.library_cat_artists
+            LibraryPage.Albums -> R.string.library_cat_albums
+            else -> R.string.library_cat_podcasts
+        }
+    )
+    val placeholder = stringResource(
+        when (page) {
+            LibraryPage.Playlists -> R.string.search_library_playlists
+            LibraryPage.Artists -> R.string.library_search_artists
+            LibraryPage.Albums -> R.string.search_library_albums
+            else -> if (podcastTab == LibraryTab.Episodes) R.string.search_library_episodes
+            else R.string.search_library_shows
+        }
+    )
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(
+                top = topContentPadding(statusBar),
+                bottom = ScreenBottomPadding + 16.dp,
+            ),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            item(key = "search") {
+                CapsuleSearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    placeholder = placeholder,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = MusiqueDimens.screenPadding)
+                        .padding(bottom = 12.dp),
+                )
+            }
+
+            when (page) {
+                LibraryPage.Playlists -> playlistItems(
+                    folders = libraryState.folders,
+                    playlists = libraryState.playlists,
+                    query = query,
+                    expandedFolderIds = expandedFolderIds,
+                    onToggleFolder = { id ->
+                        expandedFolderIds = if (id in expandedFolderIds) expandedFolderIds - id else expandedFolderIds + id
+                    },
+                    accent = accent,
+                    viewModel = viewModel,
+                    backStack = backStack,
+                    onCreateFolder = onCreateFolder,
+                    onEditFolder = onEditFolder,
+                    onDeleteFolder = onDeleteFolder,
+                    onMovePlaylist = onMovePlaylist,
+                )
+
+                LibraryPage.Albums -> {
+                    val albums = libraryState.albums.filter {
+                        query.isBlank() || it.name.contains(query, ignoreCase = true) ||
+                            it.artists.any { a -> a.name.contains(query, ignoreCase = true) }
+                    }
+                    statusItem(
+                        loading = libraryState.isLoadingAlbums && albums.isEmpty(),
+                        empty = albums.isEmpty(),
+                        loadingText = R.string.search_loading_albums,
+                        emptyText = if (query.isBlank()) R.string.library_albums_empty else R.string.library_albums_no_match,
+                    )
+                    items(albums, key = { it.uri }, contentType = { "album" }) { album ->
+                        AlbumRow(
+                            album = album,
+                            artworkUrl = album.coverUrl(),
+                            onRowClick = { backStack.add(Route.AlbumScreen(album.uri)) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+
+                LibraryPage.Artists -> {
+                    val artists = libraryArtists.filter { query.isBlank() || it.name.contains(query, ignoreCase = true) }
+                    statusItem(
+                        loading = libraryState.isLoadingAlbums && artists.isEmpty(),
+                        empty = artists.isEmpty(),
+                        loadingText = R.string.search_loading_albums,
+                        emptyText = if (query.isBlank()) R.string.library_artists_empty else R.string.library_artists_no_match,
+                    )
+                    items(artists, key = { it.uri }, contentType = { "artist" }) { artist ->
+                        ArtistRow(
+                            artist = artist,
+                            artworkUrl = artist.portraits.firstOrNull()
+                                ?: artist.covers.firstOrNull()?.let { ALBUM_COVER_URL + it.uri },
+                            onRowClick = { backStack.add(Route.ArtistScreen(artist.uri)) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+
+                else -> {
+                    item(key = "podcast_segments") {
+                        PodcastSegments(
+                            selected = podcastTab,
+                            onSelect = { viewModel.selectTab(it) },
+                            accent = accent,
+                        )
+                    }
+                    if (podcastTab == LibraryTab.Shows) {
+                        val shows = libraryState.shows.filter {
+                            query.isBlank() || it.name.contains(query, ignoreCase = true) ||
+                                it.publisher.contains(query, ignoreCase = true)
+                        }
+                        statusItem(
+                            loading = libraryState.isLoadingShows && shows.isEmpty(),
+                            empty = shows.isEmpty(),
+                            loadingText = R.string.search_loading_shows,
+                            emptyText = if (query.isBlank()) R.string.library_shows_empty else R.string.library_shows_no_match,
+                        )
+                        items(shows, key = { it.uri }, contentType = { "show" }) { show ->
+                            ShowRow(
+                                show = show,
+                                onRowClick = { backStack.add(Route.ShowScreen(show.uri)) },
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                    } else {
+                        val episodes = libraryState.episodes.filter {
+                            query.isBlank() || it.name.contains(query, ignoreCase = true) ||
+                                it.showName.contains(query, ignoreCase = true)
+                        }
+                        statusItem(
+                            loading = libraryState.isLoadingEpisodes && episodes.isEmpty(),
+                            empty = episodes.isEmpty(),
+                            loadingText = R.string.search_loading_episodes,
+                            emptyText = if (query.isBlank()) R.string.library_episodes_empty else R.string.library_episodes_no_match,
+                        )
+                        items(episodes, key = { it.uri }, contentType = { "episode" }) { episode ->
+                            val showUri = episode.showUri.ifBlank {
+                                libraryState.episodeShowUris[episode.uri]
+                            } ?: ""
+                            val openShow: () -> Unit = {
+                                if (showUri.isNotBlank()) {
+                                    backStack.add(Route.ShowScreen(showUri))
+                                } else {
+                                    scope.launch {
+                                        val details = viewModel.resolveEpisodeDetails(episode.id)
+                                        if (details != null && details.showUri.isNotBlank()) {
+                                            backStack.add(Route.ShowScreen(details.showUri))
+                                        }
+                                    }
+                                }
+                            }
+                            SwipeableEpisodeRowConfigured(
+                                episode = episode,
+                                onRowClick = { viewModel.playEpisode(episode) },
+                                onArtworkClick = openShow,
+                                onShowNameClick = openShow,
+                                isLiked = true,
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        LargeTitleTopBar(
+            title = title,
+            collapseFraction = collapseFraction,
+            onBack = onBack,
+            trailingContent = {
+                if (page == LibraryPage.Playlists) {
+                    TopBarIconButton(
+                        icon = Icons.Rounded.CreateNewFolder,
+                        contentDescription = stringResource(R.string.library_new_folder),
+                        onClick = onCreateFolder,
+                        tint = accent,
+                    )
+                    TopBarIconButton(
+                        icon = Icons.Rounded.Add,
+                        contentDescription = stringResource(R.string.library_new_playlist),
+                        onClick = { GlobalPopupController.show(PopupSpec.CreatePlaylist()) },
+                        tint = accent,
+                    )
+                }
+            },
+        )
+    }
+}
+
+private fun LazyListScope.statusItem(
+    loading: Boolean,
+    empty: Boolean,
+    loadingText: Int,
+    emptyText: Int,
+) {
+    if (!loading && !empty) return
+    item(key = "status") {
+        Text(
+            text = stringResource(if (loading) loadingText else emptyText),
+            style = MusiqueType.rowSubtitle,
+            color = MusiqueColors.textSecondary,
+            modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding, vertical = 24.dp),
+        )
+    }
+}
+
+private fun LazyListScope.playlistItems(
+    folders: List<PlaylistFolder>,
+    playlists: List<Playlist>,
+    query: String,
+    expandedFolderIds: Set<String>,
+    onToggleFolder: (String) -> Unit,
+    accent: Color,
+    viewModel: LibraryViewModel,
+    backStack: NavBackStack<NavKey>,
+    onCreateFolder: () -> Unit,
+    onEditFolder: (PlaylistFolder) -> Unit,
+    onDeleteFolder: (PlaylistFolder) -> Unit,
+    onMovePlaylist: (String, String?) -> Unit,
+) {
+    val filtered = if (query.isBlank()) playlists else playlists.filter { p ->
+        p.attributes.name.contains(query, ignoreCase = true) ||
+            p.ownerUsername.contains(query, ignoreCase = true)
+    }
+    val flatItems = buildFlatList(folders, filtered, expandedFolderIds)
+
+    if (query.isBlank()) {
+        item(key = "new_playlist") {
+            AppleListRow(
+                title = stringResource(R.string.library_new_playlist),
+                titleColor = accent,
+                onClick = { GlobalPopupController.show(PopupSpec.CreatePlaylist()) },
+                leading = { IconTile(Icons.AutoMirrored.Rounded.PlaylistAdd, iconTint = accent) },
+            )
+        }
+        item(key = "new_folder") {
+            AppleListRow(
+                title = stringResource(R.string.library_new_folder),
+                titleColor = accent,
+                onClick = onCreateFolder,
+                leading = { IconTile(Icons.Rounded.CreateNewFolder, iconTint = accent) },
+            )
+        }
+    }
+
+    if (flatItems.isEmpty()) {
+        item(key = "playlists_empty") {
+            Text(
+                text = stringResource(
+                    if (query.isBlank()) R.string.library_playlists_empty else R.string.library_playlists_no_match
+                ),
+                style = MusiqueType.rowSubtitle,
+                color = MusiqueColors.textSecondary,
+                modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding, vertical = 24.dp),
+            )
+        }
+    }
+
+    items(
+        items = flatItems,
+        key = { it.key },
+        contentType = {
+            when (it) {
+                is LibraryItem.FolderHeader -> "folder_header"
+                is LibraryItem.PlaylistRow -> "playlist"
+            }
+        }
+    ) { item ->
+        when (item) {
+            is LibraryItem.FolderHeader -> FolderRow(
+                folder = item.folder,
+                isExpanded = item.isExpanded,
+                onToggleExpand = { onToggleFolder(item.folder.id) },
+                onEdit = { onEditFolder(item.folder) },
+                onDelete = { onDeleteFolder(item.folder) },
+            )
+
+            is LibraryItem.PlaylistRow -> PlaylistRowContent(
+                playlist = item.playlist,
+                folderId = item.folderId,
+                backStack = backStack,
+                viewModel = viewModel,
+                onMovePlaylist = onMovePlaylist,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PodcastSegments(
+    selected: LibraryTab,
+    onSelect: (LibraryTab) -> Unit,
+    accent: Color,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
+            .padding(horizontal = MusiqueDimens.screenPadding)
+            .padding(bottom = 8.dp),
     ) {
-        val allowedFilters =
-            listOf(LibraryTab.Playlists, LibraryTab.Albums, LibraryTab.Shows, LibraryTab.Episodes)
-
-        allowedFilters.forEach { tab ->
-            val isSelected = tab == selectedTab
-
-            val containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-            }
-
-            val contentColor = if (isSelected) {
-                MaterialTheme.colorScheme.onPrimary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
-
+        listOf(
+            LibraryTab.Shows to R.string.search_section_shows,
+            LibraryTab.Episodes to R.string.library_cat_episodes,
+        ).forEach { (tab, label) ->
+            val isSelected = tab == selected
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(containerColor)
-                    .clickable { onTabSelected(tab) }
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center
+                    .background(if (isSelected) accent else MusiqueColors.cardRaised)
+                    .clickable { onSelect(tab) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 Text(
-                    text = tab.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    text = stringResource(label),
+                    style = MusiqueType.button,
+                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MusiqueColors.textPrimary,
                     maxLines = 1,
-                    color = contentColor
                 )
             }
         }
@@ -706,77 +768,57 @@ private fun LibraryExpressiveFilters(
 }
 
 @Composable
-private fun FolderHeaderContent(
+private fun FolderRow(
     folder: PlaylistFolder,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val folderColor = folder.toColor()
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(12.dp)) // Expressive modern radius
-                .background(folderColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Folder, null, tint = Color.White, modifier = Modifier.size(24.dp))
-        }
-
-        Spacer(Modifier.width(16.dp))
-
-        Column(
-            Modifier
-                .weight(1f)
-                .clickable { onToggleExpand() }
-        ) {
-            Text(
-                folder.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+    var menuOpen by remember { mutableStateOf(false) }
+    AppleListRow(
+        title = folder.name,
+        subtitle = stringResource(R.string.count_playlists, folder.playlistIds.size),
+        onClick = onToggleExpand,
+        leading = {
+            IconTile(
+                icon = Icons.Rounded.Folder,
+                containerColor = folder.toColor(),
+                iconTint = Color.White,
             )
-            Text(
-                stringResource(R.string.count_playlists, folder.playlistIds.size),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+        },
+        trailing = {
             Icon(
-                Icons.Default.Edit,
-                "Edit location",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                imageVector = if (isExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                contentDescription = stringResource(if (isExpanded) R.string.library_collapse else R.string.library_expand),
+                tint = MusiqueColors.textTertiary,
+                modifier = Modifier.size(22.dp),
             )
-        }
-
-        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            Icon(
-                Icons.Default.Delete,
-                "Remove row",
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Icon(
-            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-            contentDescription = if (isExpanded) "Collapse" else "Expand",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp)
-        )
-    }
+            Box {
+                RowMoreButton(onClick = { menuOpen = true })
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.library_edit_folder)) },
+                        onClick = {
+                            menuOpen = false
+                            onEdit()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(stringResource(R.string.folder_delete), color = MaterialTheme.colorScheme.error)
+                        },
+                        onClick = {
+                            menuOpen = false
+                            onDelete()
+                        },
+                    )
+                }
+            }
+        },
+    )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PlaylistRowContent(
     playlist: Playlist,
@@ -788,18 +830,15 @@ private fun PlaylistRowContent(
     val artworkUrl by produceState<String?>(null, playlist.uri) {
         value = viewModel.getArtworkUrl(playlist)
     }
-    val authors by produceState<List<app.musique.core.model.Profile>>(
-        emptyList(),
-        playlist.uri
-    ) { value = viewModel.getAuthors(playlist).take(2) }
-
-    val startIndent = if (folderId != null) 32.dp else 12.dp
+    val authors by produceState<List<Profile>>(emptyList(), playlist.uri) {
+        value = viewModel.getAuthors(playlist).take(2)
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = startIndent, end = 16.dp),
+            .padding(start = if (folderId != null) 20.dp else 0.dp),
     ) {
         Box(modifier = Modifier.weight(1f)) {
             PlaylistRow(
@@ -807,9 +846,7 @@ private fun PlaylistRowContent(
                 artworkUrl = artworkUrl,
                 onRowClick = { backStack.add(Route.PlaylistScreen(playlist.uri)) },
                 onRowLongClick = {
-                    GlobalPopupController.show(
-                        PopupSpec.PlaylistInfo(playlist, artworkUrl)
-                    )
+                    GlobalPopupController.show(PopupSpec.PlaylistInfo(playlist, artworkUrl))
                 },
                 trailingContent = {
                     Row(horizontalArrangement = Arrangement.spacedBy((-4).dp)) {
@@ -817,7 +854,7 @@ private fun PlaylistRowContent(
                             UserChipAvatar(
                                 artworkUrl = author.imageUrl,
                                 modifier = Modifier
-                                    .size(24.dp)
+                                    .size(22.dp)
                                     .clickable { backStack.add(Route.ProfileScreen(author.uri)) },
                             )
                         }
@@ -825,19 +862,44 @@ private fun PlaylistRowContent(
                 },
             )
         }
-
-        IconButton(
-            onClick = { onMovePlaylist(playlist.uri, folderId) },
-            modifier = Modifier.size(36.dp)
-        ) {
-            Icon(
-                Icons.Default.CreateNewFolder,
-                "Reorganize item",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
-            )
+        var menuOpen by remember { mutableStateOf(false) }
+        Box(Modifier.padding(end = 4.dp)) {
+            RowMoreButton(onClick = { menuOpen = true })
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.library_move_to_folder)) },
+                    leadingIcon = { Icon(Icons.Rounded.Folder, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        onMovePlaylist(playlist.uri, folderId)
+                    },
+                )
+            }
         }
     }
+}
+
+private fun Album.coverUrl(): String? =
+    (getCover(CoverSize.LARGE) ?: getCover(CoverSize.MEDIUM) ?: covers.firstOrNull())
+        ?.let { ALBUM_COVER_URL + it.uri }
+
+/** Distinct album artists in library order, so the Artists page has something to list. */
+private fun artistsFromAlbums(albums: List<Album>): List<Artist> =
+    albums.flatMap { it.artists }
+        .filter { it.uri.isNotBlank() }
+        .distinctBy { it.uri }
+        .sortedBy { it.name.lowercase() }
+
+/** Newest playlists (by revision timestamp) interleaved with saved albums, newest first. */
+private fun buildRecentlyAdded(playlists: List<Playlist>, albums: List<Album>): List<RecentItem> {
+    val recentPlaylists = playlists.sortedByDescending { it.timestamp }.take(8).map { RecentItem.PlaylistTile(it) }
+    val recentAlbums = albums.take(8).map { RecentItem.AlbumTile(it) }
+    val result = mutableListOf<RecentItem>()
+    for (i in 0 until maxOf(recentPlaylists.size, recentAlbums.size)) {
+        recentPlaylists.getOrNull(i)?.let(result::add)
+        recentAlbums.getOrNull(i)?.let(result::add)
+    }
+    return result.take(12)
 }
 
 private fun buildFlatList(
