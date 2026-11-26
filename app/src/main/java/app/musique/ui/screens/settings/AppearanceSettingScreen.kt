@@ -8,7 +8,6 @@ import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DesignServices
-import androidx.compose.material.icons.filled.Houseboat
 import androidx.compose.material.icons.filled.MonochromePhotos
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
@@ -205,26 +204,15 @@ fun AppearanceSettingScreen(
 
         item {
             SettingsSection(title = "Experimental", icon = Icons.Default.Science) {
+                // The floating tab bar is now the only navigation, so its old opt-in toggle is gone.
                 entry {
                     SwitchPreferenceEntry(
-                        title = { Text(stringResource(R.string.settings_floating_navbar)) },
-                        description = stringResource(R.string.settings_dynamic_header_desc),
-                        icon = { Icon(Icons.Default.Houseboat, contentDescription = null) },
-                        isChecked = settings.experimentalFloatingNav,
-                        onCheckedChange = { viewModel.setExperimentalFloatingNav(it) },
+                        title = { Text(stringResource(R.string.settings_show_selected_label)) },
+                        description = stringResource(R.string.settings_show_selected_label_desc),
+                        icon = { Icon(Icons.Default.Title, contentDescription = null) },
+                        isChecked = settings.navbarShowLabel,
+                        onCheckedChange = { viewModel.setNavbarShowLabel(it) },
                     )
-                }
-
-                if (settings.experimentalFloatingNav) {
-                    entry {
-                        SwitchPreferenceEntry(
-                            title = { Text(stringResource(R.string.settings_show_selected_label)) },
-                            description = stringResource(R.string.settings_show_selected_label_desc),
-                            icon = { Icon(Icons.Default.Title, contentDescription = null) },
-                            isChecked = settings.navbarShowLabel,
-                            onCheckedChange = { viewModel.setNavbarShowLabel(it) },
-                        )
-                    }
                 }
             }
         }
