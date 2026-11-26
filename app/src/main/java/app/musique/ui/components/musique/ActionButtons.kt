@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
@@ -71,9 +72,11 @@ fun PlayShuffleRow(
     val view = LocalView.current
 
     if (onSaveClick != null) {
+        // Cider's album row: a compact centred segmented control, round outer ends, a white
+        // Play with tight corners in the middle.
         Row(
             modifier = modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ActionSquircleButton(
@@ -84,8 +87,9 @@ fun PlayShuffleRow(
                 containerColor = secondaryColor,
                 contentColor = onSecondaryColor,
                 enabled = enabled,
+                shape = SegmentStart,
                 modifier = Modifier
-                    .weight(0.24f)
+                    .width(60.dp)
                     .height(MusiqueDimens.actionButtonHeight),
             ) {
                 Icon(
@@ -103,8 +107,9 @@ fun PlayShuffleRow(
                 containerColor = primaryColor,
                 contentColor = onPrimaryColor,
                 enabled = enabled,
+                shape = SegmentMiddle,
                 modifier = Modifier
-                    .weight(0.52f)
+                    .width(124.dp)
                     .height(MusiqueDimens.actionButtonHeight),
             ) {
                 Row(
@@ -134,8 +139,9 @@ fun PlayShuffleRow(
                 containerColor = secondaryColor,
                 contentColor = onSecondaryColor,
                 enabled = enabled,
+                shape = SegmentEnd,
                 modifier = Modifier
-                    .weight(0.24f)
+                    .width(60.dp)
                     .height(MusiqueDimens.actionButtonHeight),
             ) {
                 Icon(
@@ -215,6 +221,10 @@ fun PlayShuffleRow(
         }
     }
 }
+
+private val SegmentStart = RoundedCornerShape(topStart = 26.dp, bottomStart = 26.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+private val SegmentMiddle = RoundedCornerShape(8.dp)
+private val SegmentEnd = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 26.dp, bottomEnd = 26.dp)
 
 /**
  * Tonal squircle button with Apple-style spring press scale.
