@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lyrics_back_to_current">Back to current line</string>
+    <string name="lyrics_missing">No lyrics for this song</string>
+    <string name="lyrics_loading">Loading lyrics</string>
+    <string name="lyrics_instrumental">Instrumental</string>
+</resources>

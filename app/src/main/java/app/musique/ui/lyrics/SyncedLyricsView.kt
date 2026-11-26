@@ -1,15 +1,13 @@
 package app.musique.ui.lyrics
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import app.musique.ui.theme.MusiqueColors
-import app.musique.ui.theme.MusiqueType
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.musique.ui.viewmodel.bottomsheet.LyricsViewModel
 
 /**
  * Apple Music style synced lyrics for the track that is playing, drawn on a transparent
@@ -29,8 +27,21 @@ fun SyncedLyricsView(
     onUserScrollingChange: (Boolean) -> Unit = {},
     onBackgroundTap: () -> Unit = {},
 ) {
-    // Placeholder until the lyrics engine lands.
-    Box(modifier.fillMaxSize().padding(contentPadding), contentAlignment = Alignment.Center) {
-        Text("Lyrics", style = MusiqueType.lyricLine, color = MusiqueColors.textSecondary)
-    }
+    // Keyed so it never shares state with the lyrics sheet, which loads a chosen track.
+    val viewModel: LyricsViewModel = hiltViewModel(key = "now-playing-lyrics")
+    LaunchedEffect(viewModel) { viewModel.followNowPlaying() }
+
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val romanize by viewModel.shouldRomanize.collectAsStateWithLifecycle()
+
+    LyricsContent(
+        state = state,
+        clock = viewModel.clock,
+        onSeek = viewModel::seekTo,
+        modifier = modifier,
+        romanize = romanize,
+        contentPadding = contentPadding,
+        onUserScrollingChange = onUserScrollingChange,
+        onBackgroundTap = onBackgroundTap,
+    )
 }
