@@ -38,7 +38,7 @@ class SyncNotificationManager @Inject constructor(
 
     fun showProgress(current: Int, total: Int) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notif_syncing_liked_tracks))
             .setContentText(context.getString(R.string.notif_sync_progress, current, total))
             .setProgress(total, current, false)
@@ -50,7 +50,7 @@ class SyncNotificationManager @Inject constructor(
 
     fun showIndeterminate() {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notif_syncing_liked_tracks))
             .setContentText(context.getString(R.string.notif_starting))
             .setProgress(0, 0, true)
@@ -62,7 +62,7 @@ class SyncNotificationManager @Inject constructor(
 
     fun showComplete(count: Int) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notif_complete))
             .setContentText(context.getString(R.string.notif_synced, count))
             .setOngoing(false)
@@ -74,7 +74,7 @@ class SyncNotificationManager @Inject constructor(
 
     fun showError(message: String) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.notif_failed))
             .setContentText(message)
             .setOngoing(false)

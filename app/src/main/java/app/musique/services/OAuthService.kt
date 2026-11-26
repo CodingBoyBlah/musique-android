@@ -27,7 +27,7 @@ class OAuthService : Service() {
             return NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle(context.getString(R.string.notif_logging_in))
                 .setContentText(context.getString(R.string.notif_oauth_complete))
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .build()

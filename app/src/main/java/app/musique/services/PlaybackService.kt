@@ -170,7 +170,7 @@ class PlaybackService : MediaLibraryService(),
         }
         try {
             val placeholder = NotificationCompat.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(getString(R.string.app_name))
                 .setSilent(true)
                 .build()
@@ -202,7 +202,7 @@ class PlaybackService : MediaLibraryService(),
                 .setNotificationId(NOTIFICATION_ID)
                 .build()
                 .apply {
-                    setSmallIcon(R.drawable.ic_launcher_foreground)
+                    setSmallIcon(R.drawable.ic_notification)
                 }
         )
 
