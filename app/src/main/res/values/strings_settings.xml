@@ -9,4 +9,12 @@
     <string name="sheet_play_last">Play Last</string>
     <string name="sheet_playlist_public_desc">Anyone can see this playlist</string>
     <string name="sheet_playlist_private_desc">Only you can see this playlist</string>
+
+    <!-- Onboarding -->
+    <string name="onb_welcome_title">Welcome to Musique</string>
+    <string name="onb_welcome_body">All of Spotify in a player that feels at home on your phone. Connect a Premium account to start listening.</string>
+    <string name="onb_connect_playback">Connect Playback</string>
+    <string name="onb_connected">Connected</string>
+    <string name="onb_how_it_works">How it works</string>
+    <string name="onb_hide_details">Hide details</string>
 </resources>
