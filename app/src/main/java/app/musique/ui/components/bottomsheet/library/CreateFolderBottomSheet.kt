@@ -1,5 +1,7 @@
 package app.musique.ui.components.bottomsheet.library
 
+import app.musique.ui.components.bottomsheet.*
+import androidx.compose.foundation.layout.Box
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
@@ -77,48 +79,38 @@ fun CreateFolderBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    Icons.Default.CreateNewFolder,
-                    contentDescription = null,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .clip(MaterialShapes.Cookie9Sided.toShape())
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(selectedColor)
-                        .padding(12.dp)
-                        .size(20.dp)
-                )
-
+                ) {
+                    Icon(
+                        Icons.Default.CreateNewFolder,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
                 Spacer(modifier = Modifier.width(12.dp))
+                SheetTitle(text = if (isEditMode) "Edit Folder" else "Create Folder")
+            }
 
-                Text(
-                    text = if (isEditMode) "Edit Folder" else "Create Folder",
-                    style = MaterialTheme.typography.headlineMediumEmphasized,
-                    fontWeight = FontWeight.Black,
+            SheetActionGroup {
+                SheetTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    placeholder = stringResource(R.string.folder_name),
                 )
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(R.string.folder_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Text(
-                text = stringResource(R.string.folder_color),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-            )
+            SheetSectionLabel(stringResource(R.string.folder_color))
 
             ColorPicker(
                 initial = selectedColor,
@@ -127,44 +119,30 @@ fun CreateFolderBottomSheet(
 
                 )
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            sheetState.hide()
-                            onDismiss()
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-
-                Button(
-                    onClick = {
-                        val id = folderId ?: UUID.randomUUID().toString()
-                        val folder = PlaylistFolder(
-                            id = id,
-                            name = name.trim(),
-                            color = selectedColor.toArgb().toLong(),
-                        )
-                        onCreated(folder)
-                        coroutineScope.launch {
-                            sheetState.hide()
-                            onDismiss()
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = name.isNotBlank(),
-                ) {
-                    Text(if (isEditMode) stringResource(R.string.common_save) else stringResource(R.string.common_create))
-                }
-            }
+            SheetButtonRow(
+                primaryText = if (isEditMode) stringResource(R.string.common_save) else stringResource(R.string.common_create),
+                primaryEnabled = name.isNotBlank(),
+                onPrimary = {
+                    val id = folderId ?: UUID.randomUUID().toString()
+                    val folder = PlaylistFolder(
+                        id = id,
+                        name = name.trim(),
+                        color = selectedColor.toArgb().toLong(),
+                    )
+                    onCreated(folder)
+                    coroutineScope.launch {
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                },
+                secondaryText = stringResource(R.string.common_cancel),
+                onSecondary = {
+                    coroutineScope.launch {
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                },
+            )
 
             Spacer(modifier = Modifier.height(6.dp))
         }

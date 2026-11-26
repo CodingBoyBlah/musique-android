@@ -1,5 +1,7 @@
 package app.musique.ui.components.bottomsheet.library
 
+import app.musique.ui.components.bottomsheet.SheetTitle
+import androidx.compose.material.icons.filled.Check
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -67,33 +69,10 @@ fun MoveToFolderBottomSheet(
                 .fillMaxWidth()
                 .padding(bottom = 24.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-            ) {
-                Icon(
-                    Icons.Default.LibraryMusic,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clip(MaterialShapes.Cookie9Sided.toShape())
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(12.dp)
-                        .size(20.dp)
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Text(
-                    text = stringResource(R.string.folder_move),
-                    style = MaterialTheme.typography.headlineMediumEmphasized,
-                    fontWeight = FontWeight.Black,
-                )
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SheetTitle(
+                text = stringResource(R.string.folder_move),
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+            )
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -121,14 +100,15 @@ fun MoveToFolderBottomSheet(
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
                             text = stringResource(R.string.folder_no_folder),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = app.musique.ui.theme.MusiqueType.rowTitle,
                         )
                         if (currentFolderId == null) {
                             Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                text = "✓",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
@@ -154,14 +134,15 @@ fun MoveToFolderBottomSheet(
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
                             text = folder.name,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = app.musique.ui.theme.MusiqueType.rowTitle,
                         )
                         if (currentFolderId == folder.id) {
                             Spacer(modifier = Modifier.weight(1f))
-                            Text(
-                                text = "✓",
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold,
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }

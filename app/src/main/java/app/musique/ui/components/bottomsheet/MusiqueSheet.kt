@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -681,4 +682,31 @@ fun SheetSwitchRow(
             enabled = enabled,
         )
     }
+}
+
+/** Single choice row: label with an accent checkmark when selected, like iOS pickers. */
+@Composable
+fun SheetCheckRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    SheetActionRow(
+        label = label,
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        trailing = if (selected) {
+            {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        } else null
+    )
 }

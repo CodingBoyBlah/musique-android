@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.library
 
+import app.musique.ui.components.bottomsheet.*
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
@@ -47,155 +48,79 @@ fun FilterSortBottomSheet(
         onDismissRequest = onDismissRequest,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
+        SheetContent(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            spacing = 8.dp
         ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    Icons.Default.FilterAlt,
-                    contentDescription = stringResource(R.string.common_filter_and_sort),
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(
-                    text = stringResource(R.string.filter_sort),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Filters Section
-            Text(
-                text = stringResource(R.string.filter_filters),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
+            SheetTitle(
+                text = stringResource(R.string.filter_sort),
+                modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            // Explicit Filter
-            Column(
-                modifier = Modifier.padding(bottom = 24.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.filter_explicit),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                val explicitOptions = listOf(
-                    ExplicitFilter.BOTH to stringResource(R.string.filter_show_all),
-                    ExplicitFilter.EXPLICIT_ONLY to stringResource(R.string.filter_explicit_only),
-                    ExplicitFilter.NON_EXPLICIT_ONLY to stringResource(R.string.filter_non_explicit_only)
-                )
-                explicitOptions.forEach { (option, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = explicitFilter == option,
-                            onClick = { onExplicitFilterChange(option) }
-                        )
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
+            SheetSectionLabel(stringResource(R.string.filter_explicit))
+            val explicitOptions = listOf(
+                ExplicitFilter.BOTH to stringResource(R.string.filter_show_all),
+                ExplicitFilter.EXPLICIT_ONLY to stringResource(R.string.filter_explicit_only),
+                ExplicitFilter.NON_EXPLICIT_ONLY to stringResource(R.string.filter_non_explicit_only)
+            )
+            SheetActionGroup {
+                explicitOptions.forEachIndexed { index, (option, label) ->
+                    if (index > 0) SheetDivider()
+                    SheetCheckRow(
+                        label = label,
+                        selected = explicitFilter == option,
+                        onClick = { onExplicitFilterChange(option) }
+                    )
                 }
             }
 
-            // Artist Name Filter
-            TextField(
-                value = artistNameFilter,
-                onValueChange = onArtistNameFilterChange,
-                label = { Text(stringResource(R.string.filter_artist_name)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                singleLine = true
+            SheetSectionLabel(
+                stringResource(R.string.filter_filters),
+                modifier = Modifier.padding(top = 8.dp)
             )
+            SheetActionGroup {
+                SheetTextField(
+                    value = artistNameFilter,
+                    onValueChange = onArtistNameFilterChange,
+                    placeholder = stringResource(R.string.filter_artist_name),
+                )
+                SheetDivider()
+                SheetTextField(
+                    value = trackNameFilter,
+                    onValueChange = onTrackNameFilterChange,
+                    placeholder = stringResource(R.string.filter_track_name),
+                )
+            }
 
-            // Track Name Filter
-            TextField(
-                value = trackNameFilter,
-                onValueChange = onTrackNameFilterChange,
-                label = { Text(stringResource(R.string.filter_track_name)) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                singleLine = true
+            SheetSectionLabel(
+                stringResource(R.string.filter_sort_by),
+                modifier = Modifier.padding(top = 8.dp)
             )
-
-            // Sort Section
-            Text(
-                text = stringResource(R.string.filter_sort_by),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // Sort Options
             val sortOptions = listOf(
                 SortBy.POSITION to stringResource(R.string.sort_added_default),
                 SortBy.ARTIST_NAME to stringResource(R.string.sort_artist_name),
                 SortBy.TRACK_NAME to stringResource(R.string.sort_track_name),
                 SortBy.DURATION to stringResource(R.string.sort_duration)
             )
-
-            Column(
-                modifier = Modifier.padding(bottom = 20.dp)
-            ) {
-                sortOptions.forEach { (option, label) ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = sortBy == option,
-                            onClick = { onSortByChange(option) }
-                        )
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
+            SheetActionGroup {
+                sortOptions.forEachIndexed { index, (option, label) ->
+                    if (index > 0) SheetDivider()
+                    SheetCheckRow(
+                        label = label,
+                        selected = sortBy == option,
+                        onClick = { onSortByChange(option) }
+                    )
                 }
             }
 
-            // Sort Direction
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = if (sortAscending) stringResource(R.string.sort_ascending) else stringResource(R.string.sort_descending),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Switch(
+            SheetActionGroup(modifier = Modifier.padding(top = 8.dp)) {
+                SheetSwitchRow(
+                    label = if (sortAscending) stringResource(R.string.sort_ascending)
+                    else stringResource(R.string.sort_descending),
                     checked = sortAscending,
                     onCheckedChange = onSortAscendingChange
                 )
             }
-
-            // Bottom spacing
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.padding(bottom = 8.dp))
         }
     }
 }
