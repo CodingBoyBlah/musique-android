@@ -8,55 +8,60 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PersonRemove
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.PersonRemove
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.musique.R
 import app.musique.ScreenBottomPadding
 import app.musique.core.model.ProfilePlaylist
 import app.musique.data.setting.LocalUiSettings
-import app.musique.ui.components.ArtworkBackground
-import app.musique.ui.components.CollapsingHeader
 import app.musique.ui.components.ErrorScreen
 import app.musique.ui.components.ProfileDetailSkeleton
 import app.musique.ui.components.ScreenshotAvatar
 import app.musique.ui.components.SmartImage
-import app.musique.ui.components.rememberCollapsingHeaderState
+import app.musique.ui.components.musique.ActionSquircleButton
+import app.musique.ui.components.musique.AppleListRow
+import app.musique.ui.components.musique.DetailFloatingTopBar
+import app.musique.ui.components.musique.DetailPaletteGradientBackdrop
+import app.musique.ui.components.musique.GroupedTrackItemContainer
+import app.musique.ui.components.musique.SectionHeader
+import app.musique.ui.components.musique.rememberCollapseFraction
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.theme.MusiqueType
+import app.musique.ui.theme.rememberArtworkPalette
 import app.musique.ui.viewmodel.library.ProfileDetailViewModel
 import app.musique.ui.viewmodel.library.ProfileUiState
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProfileDetailScreen(
     viewModel: ProfileDetailViewModel,
@@ -69,37 +74,26 @@ fun ProfileDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val currentUserId by viewModel.currentUserId.collectAsState(initial = null)
     val screenshotMode = LocalUiSettings.current.screenshotMode
-    val density = LocalDensity.current
-    val collapsingState = rememberCollapsingHeaderState()
     val lazyList = rememberLazyListState()
-    val atTop by remember {
-        derivedStateOf {
-            lazyList.firstVisibleItemIndex == 0 &&
-                    lazyList.firstVisibleItemScrollOffset == 0
-        }
-    }
-    SideEffect { collapsingState.canExpand = atTop }
-
-    LaunchedEffect(lazyList.isScrollInProgress) {
-        if (!lazyList.isScrollInProgress) {
-            val canExpand =
-                lazyList.firstVisibleItemIndex == 0 &&
-                        lazyList.firstVisibleItemScrollOffset == 0
-
-            collapsingState.snapIfNeeded(canExpand)
-        }
-    }
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val collapseFraction = rememberCollapseFraction(lazyList, thresholdDp = 220.dp)
 
     when (val state = uiState) {
         is ProfileUiState.Loading -> {
-            ProfileDetailSkeleton(modifier = modifier.fillMaxSize())
+            Box(modifier.fillMaxSize().background(MusiqueColors.canvas)) {
+                ProfileDetailSkeleton(modifier = Modifier.fillMaxSize())
+                DetailFloatingTopBar(title = "", collapseFraction = 0f, onBack = onBack)
+            }
         }
 
         is ProfileUiState.Error -> {
-            ErrorScreen(
-                message = state.message,
-                onRetry = { viewModel.retry() },
-            )
+            Box(modifier.fillMaxSize().background(MusiqueColors.canvas)) {
+                ErrorScreen(
+                    message = state.message,
+                    onRetry = { viewModel.retry() },
+                )
+                DetailFloatingTopBar(title = "", collapseFraction = 0f, onBack = onBack)
+            }
         }
 
         is ProfileUiState.Success -> {
@@ -108,97 +102,133 @@ fun ProfileDetailScreen(
                 profile?.uri == "spotify:user:$currentUserId"
             val artworkUrl = if (hideProfile) null else profile?.imageUrl
             val playlists = profile?.publicPlaylists ?: emptyList()
+            val name = if (hideProfile) stringResource(R.string.screenshot_mode_username) else profile?.name ?: ""
+            val palette = rememberArtworkPalette(artworkUrl)
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(color = MaterialTheme.colorScheme.surface)
-                    .nestedScroll(collapsingState.nestedScrollConnection)
-            ) {
-                val currentTopBarHeightDp = with(density) { collapsingState.height.value.toDp() }
+            Box(modifier = modifier.fillMaxSize()) {
+                DetailPaletteGradientBackdrop(palette = palette)
 
                 LazyColumn(
                     state = lazyList,
-                    contentPadding = PaddingValues(top = currentTopBarHeightDp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = PaddingValues(
+                        top = statusBarTop + MusiqueDimens.collapsedBarHeight + 12.dp,
+                        bottom = ScreenBottomPadding + 24.dp,
+                    ),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    item {
-                        ProfileStatsRow(
-                            followersCount = state.followersCount,
-                            followingCount = state.followingCount,
-                            onFollowersClick = onFollowersClick,
-                            onFollowingClick = onFollowingClick
-                        )
-                    }
-
-                    item {
-                        OutlinedButton(
-                            onClick = { viewModel.toggleFollow() },
+                    item(key = "profile_hero") {
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .padding(horizontal = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Icon(
-                                imageVector = if (state.isFollowing) Icons.Filled.PersonRemove else Icons.Filled.PersonAdd,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(168.dp)
+                                    .shadow(16.dp, CircleShape)
+                                    .clip(CircleShape)
+                                    .background(MusiqueColors.avatarPlaceholder),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                when {
+                                    hideProfile -> ScreenshotAvatar(Modifier.size(168.dp))
+                                    !artworkUrl.isNullOrBlank() -> SmartImage(
+                                        url = artworkUrl,
+                                        shape = CircleShape,
+                                        contentDescription = name,
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                    else -> Icon(
+                                        Icons.Rounded.Person,
+                                        contentDescription = null,
+                                        tint = MusiqueColors.avatarPlaceholderIcon,
+                                        modifier = Modifier.size(72.dp),
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
                             Text(
-                                text = if (state.isFollowing) stringResource(R.string.common_unfollow) else stringResource(R.string.common_follow)
+                                text = name,
+                                style = MusiqueType.heroTitle,
+                                color = MusiqueColors.textPrimary,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                                ProfileStat(
+                                    value = formatCount(state.followersCount),
+                                    label = stringResource(R.string.library_followers),
+                                    onClick = onFollowersClick,
+                                )
+                                ProfileStat(
+                                    value = formatCount(state.followingCount),
+                                    label = stringResource(R.string.library_following),
+                                    onClick = onFollowingClick,
+                                )
+                            }
+                        }
+                    }
+
+                    item(key = "profile_follow") {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            ActionSquircleButton(
+                                onClick = { viewModel.toggleFollow() },
+                                containerColor = if (state.isFollowing) palette.surface.copy(alpha = 0.94f) else Color.White,
+                                contentColor = if (state.isFollowing) MusiqueColors.textPrimary else MusiqueColors.onDarkPlay,
+                                shape = CircleShape,
+                                modifier = Modifier
+                                    .padding(vertical = 18.dp)
+                                    .width(180.dp)
+                                    .height(46.dp),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (state.isFollowing) Icons.Rounded.PersonRemove else Icons.Rounded.PersonAdd,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(if (state.isFollowing) R.string.common_unfollow else R.string.common_follow),
+                                        style = MusiqueType.button,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (playlists.isNotEmpty()) {
+                        item(key = "profile_playlists_header") {
+                            SectionHeader(
+                                title = stringResource(R.string.playlist_public_playlists),
+                                modifier = Modifier.padding(top = 8.dp, bottom = 10.dp),
                             )
                         }
                     }
 
-                    item {
-                        Text(
-                            text = stringResource(R.string.playlist_public_playlists),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp, top = 16.dp)
-                        )
-                    }
-
-                    items(playlists) { playlist ->
-                        ProfilePlaylistRow(
-                            playlist = playlist,
-                            onClick = { onPlaylistClick(playlist.uri) }
-                        )
-                    }
-
-                    item {
-                        Spacer(Modifier.height(ScreenBottomPadding))
+                    itemsIndexed(playlists, key = { _, p -> p.uri }) { index, playlist ->
+                        GroupedTrackItemContainer(
+                            index = index,
+                            count = playlists.size,
+                            containerColor = palette.surface,
+                            dividerStartInset = 76.dp,
+                        ) {
+                            ProfilePlaylistRow(
+                                playlist = playlist,
+                                onClick = { onPlaylistClick(playlist.uri) },
+                            )
+                        }
                     }
                 }
 
-                CollapsingHeader(
-                    collapseFraction = collapsingState.collapseFraction,
-                    headerHeight = currentTopBarHeightDp,
-                    onBackPressed = onBack,
-                    backgroundContent = {
-                        if (hideProfile) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                ScreenshotAvatar(Modifier.size(96.dp))
-                            }
-                        } else {
-                            ArtworkBackground(artworkUrl = artworkUrl)
-                        }
-                    },
-                    titleContent = {
-                        Text(
-                            text = if (hideProfile) stringResource(R.string.screenshot_mode_username)
-                                else profile?.name ?: "",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Text(
-                            text = stringResource(R.string.account_playlist_count, playlists.size),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                DetailFloatingTopBar(
+                    title = name,
+                    collapseFraction = collapseFraction,
+                    onBack = onBack,
+                    tintColor = palette.backgroundTop,
                 )
             }
         }
@@ -206,50 +236,17 @@ fun ProfileDetailScreen(
 }
 
 @Composable
-private fun ProfileStatsRow(
-    followersCount: Int,
-    followingCount: Int,
-    onFollowersClick: () -> Unit,
-    onFollowingClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun ProfileStat(value: String, label: String, onClick: () -> Unit) {
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp)
+        modifier = Modifier
+            .clip(MusiqueShapes.artworkSmall)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clickable(onClick = onFollowersClick)
-        ) {
-            Text(
-                text = formatCount(followersCount),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = stringResource(R.string.library_followers),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clickable(onClick = onFollowingClick)
-        ) {
-            Text(
-                text = formatCount(followingCount),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = stringResource(R.string.library_following),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Text(text = value, style = MusiqueType.cardTitle, color = MusiqueColors.textPrimary)
+        Spacer(Modifier.width(4.dp))
+        Text(text = label, style = MusiqueType.cardSubtitle, color = MusiqueColors.textSecondary)
     }
 }
 
@@ -257,53 +254,20 @@ private fun ProfileStatsRow(
 private fun ProfilePlaylistRow(
     playlist: ProfilePlaylist,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
-    val artworkUrl = playlist.imageUrl
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(onClick = onClick),
-        tonalElevation = 2.dp,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Surface(
-                tonalElevation = 4.dp,
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(48.dp)
-            ) {
-                SmartImage(
-                    url = artworkUrl,
-                    monochrome = LocalUiSettings.current.monochromePlaylists
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = playlist.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = stringResource(R.string.count_followers, playlist.followersCount),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-        }
-    }
+    AppleListRow(
+        title = playlist.name,
+        subtitle = stringResource(R.string.count_followers, playlist.followersCount),
+        onClick = onClick,
+        leading = {
+            SmartImage(
+                url = playlist.imageUrl,
+                imageSize = MusiqueDimens.rowArtworkSize,
+                shape = MusiqueShapes.artworkSmall,
+                monochrome = LocalUiSettings.current.monochromePlaylists,
+            )
+        },
+    )
 }
 
 private fun formatCount(count: Int): String {
