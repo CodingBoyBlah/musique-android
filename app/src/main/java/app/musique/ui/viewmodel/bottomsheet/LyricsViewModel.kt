@@ -9,9 +9,19 @@ import app.musique.core.spirc.SpircWrapper
 import app.musique.data.repository.PlayerRepository
 import app.musique.data.repository.SettingsRepository
 import app.musique.playback.PlaybackStateHolder
+import app.musique.ui.lyrics.LyricsUiState
+import app.musique.ui.lyrics.PlaybackClockSnapshot
 import app.musique.ui.viewmodel.player.positionTicks
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,8 +62,11 @@ class LyricsViewModel @Inject constructor(
     private val _isEpisode = MutableStateFlow(false)
     val isEpisode: StateFlow<Boolean> = _isEpisode.asStateFlow()
 
+    private val _loading = MutableStateFlow(false)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
     val hasSyncedContent: StateFlow<Boolean> = _lyrics
-        .map { it.isNotEmpty() }
+        .map { lines -> lines.any { it.synced } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val shouldRomanize = settingsRepository.romanizeLyrics
@@ -63,6 +76,8 @@ class LyricsViewModel @Inject constructor(
     private val lyricsCache = mutableMapOf<String, List<LyricLine>>()
     private var followCurrentTrack = false
     private var currentAudioObserver: Job? = null
+    private var fetchJob: Job? = null
+    private var nowPlayingObserver: Job? = null
 
     val currentAudio: StateFlow<PlayableAudio?> = playbackStateHolder.state
         .map { it.currentAudio }
@@ -76,7 +91,87 @@ class LyricsViewModel @Inject constructor(
         .map { it.currentAudio?.duration ?: 0L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
+    /** Everything the lyrics view needs to decide between loading, missing, static and synced. */
+    val uiState: StateFlow<LyricsUiState> = combine(
+        _lyrics, _loading, _isEpisode, _displayedTrack,
+    ) { lines, loading, episode, track ->
+        when {
+            episode -> LyricsUiState.Episode
+            track == null -> LyricsUiState.Idle
+            loading -> LyricsUiState.Loading
+            lines.isEmpty() -> LyricsUiState.Missing
+            else -> LyricsUiState.Ready(track.id, lines)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LyricsUiState.Loading)
+
+    /**
+     * Playback position reports for the lyric clock: one per 250ms while playing and one on every
+     * play, pause, seek, speed or track change. The view interpolates between them per frame.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val clock: Flow<PlaybackClockSnapshot> = playbackStateHolder.state.flatMapLatest { state ->
+        fun snapshot() = PlaybackClockSnapshot(
+            trackId = state.currentAudio?.id,
+            basePositionMs = playbackStateHolder.estimatePosition().inWholeMilliseconds,
+            durationMs = state.currentAudio?.duration ?: 0L,
+            isPlaying = state.isPlaying,
+            isBuffering = state.isBuffering,
+            playbackSpeed = state.playbackSpeed,
+        )
+        if (state.isPlaying) {
+            flow {
+                while (true) {
+                    emit(snapshot())
+                    delay(CLOCK_TICK_MS)
+                }
+            }
+        } else {
+            flowOf(snapshot())
+        }
+    }
+
+    /**
+     * Shows lyrics for whatever is playing and keeps following it across track changes.
+     * Used by the Now Playing lyrics mode; safe to call again.
+     */
+    fun followNowPlaying() {
+        if (nowPlayingObserver?.isActive == true) return
+        currentAudioObserver?.cancel()
+        followCurrentTrack = true
+        nowPlayingObserver = viewModelScope.launch {
+            playbackStateHolder.state
+                .map { it.currentAudio }
+                .distinctUntilChangedBy { it?.id }
+                .collect { audio -> showAudio(audio) }
+        }
+    }
+
+    private fun showAudio(audio: PlayableAudio?) {
+        when {
+            audio == null -> clearFor(episode = false)
+            audio.isTrack() -> {
+                val track = audio.sourceTrack ?: audio.toLyricsTrack()
+                _displayedTrack.value = track
+                _isEpisode.value = false
+                _isCurrentTrack.value = true
+                fetchLyrics(track)
+            }
+            else -> clearFor(episode = true)
+        }
+    }
+
+    private fun clearFor(episode: Boolean) {
+        fetchJob?.cancel()
+        _displayedTrack.value = null
+        _isEpisode.value = episode
+        _loading.value = false
+        _lyrics.value = emptyList()
+        _isCurrentTrack.value = false
+    }
+
     fun loadLyrics(track: Track, followCurrentTrack: Boolean = false) {
+        nowPlayingObserver?.cancel()
+        nowPlayingObserver = null
         this.followCurrentTrack = followCurrentTrack
         _displayedTrack.value = track
         _isEpisode.value = false
@@ -116,7 +211,9 @@ class LyricsViewModel @Inject constructor(
                         _isCurrentTrack.value = false
                     }
                 } else {
+                    fetchJob?.cancel()
                     _isEpisode.value = true
+                    _loading.value = false
                     _lyrics.value = emptyList()
                     _isCurrentTrack.value = false
                 }
@@ -126,15 +223,23 @@ class LyricsViewModel @Inject constructor(
 
     private fun fetchLyrics(track: Track) {
         val trackId = track.id
+        fetchJob?.cancel()
         val cached = lyricsCache[trackId]
         if (cached != null) {
             _lyrics.value = cached
+            _loading.value = false
             return
         }
-        viewModelScope.launch {
+        _lyrics.value = emptyList()
+        _loading.value = true
+        fetchJob = viewModelScope.launch {
             val result = playerRepository.getLyrics(track)
+            // A slower answer for a track we already moved past must not replace the current one.
+            if (_displayedTrack.value?.id != trackId) return@launch
             _lyrics.value = result
-            lyricsCache[trackId] = result
+            _loading.value = false
+            // Empty can mean a timeout; let the next visit try again.
+            if (result.isNotEmpty()) lyricsCache[trackId] = result
         }
     }
 
@@ -169,3 +274,16 @@ class LyricsViewModel @Inject constructor(
         }
     }
 }
+
+private const val CLOCK_TICK_MS = 250L
+
+/** Enough of a [Track] for the lyrics lookup when playback has no full track attached (remote Connect). */
+private fun PlayableAudio.toLyricsTrack(): Track = Track(
+    id = id,
+    uri = uri,
+    name = name,
+    artists = artists.orEmpty(),
+    duration = duration,
+    explicit = explicit,
+    files = emptyList(),
+)
