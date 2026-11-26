@@ -106,9 +106,11 @@ class Player @Inject constructor(
                     json_raw: String
                 ) {
                     val generation = stateHolder.captureLocalEvent()
+                    // Report what is coming out of the speaker, not what the decoder just produced.
+                    val heardMs = (position_ms - engine.pendingOutputMs()).coerceAtLeast(0L)
                     scope.launch {
                         if (!stateHolder.acceptsLocalEvent(generation)) return@launch
-                        stateHolder.seekTo(position_ms.toDuration(DurationUnit.MILLISECONDS))
+                        stateHolder.seekTo(heardMs.toDuration(DurationUnit.MILLISECONDS))
 
                         if (spotify_uri.startsWith("spotify:episode:") && stateHolder.needsLocalMetadata(spotify_uri)) {
                             val episode: Episode? = try {

@@ -18,6 +18,13 @@ import kotlin.math.max
 
 private const val TAG = "AudioEngine"
 
+/**
+ * Output buffer length. The old 1024 frame (~23 ms) buffer underran whenever the decoder thread was
+ * descheduled for a moment (UI work, GC, a slow read), which is the crackle and stutter people hear.
+ * ExoPlayer keeps about 250 ms; this is enough headroom without making pause feel late.
+ */
+private const val OUTPUT_BUFFER_MS = 150
+
 enum class PcmFormat {
     S16,
 }
@@ -48,6 +55,14 @@ class AudioEngine(
     private var sonicCommittedSpeed = 1f
 
     private val writeLock = ReentrantLock()
+
+    /** Frames handed to the current AudioTrack since it was created or last flushed. */
+    @Volatile
+    private var framesWritten = 0L
+    private var frameBytes = 4
+
+    /** The decoder thread is native and starts at normal priority; promote it once. */
+    private val promotedThread = ThreadLocal.withInitial { false }
 
     init {
         // Registers this class as the PCM callback.
@@ -101,7 +116,7 @@ class AudioEngine(
                 else -> 2
             }
             val frameSize = bytesPerSample * max(1, channels)
-            val bufferSize = max(minBufferSize, frameSize * 1024)
+            val bufferSize = max(minBufferSize * 2, frameSize * sampleRate / 1000 * OUTPUT_BUFFER_MS)
 
             try {
                 val attrs = AudioAttributes.Builder()
@@ -131,6 +146,8 @@ class AudioEngine(
                 newTrack.play()
 
                 audioTrack = newTrack
+                framesWritten = 0L
+                frameBytes = frameSize
                 currentSampleRate = sampleRate
                 currentChannels = channels
                 currentFormat = format
@@ -171,6 +188,7 @@ class AudioEngine(
                 } catch (ignored: Exception) {
                 }
                 audioTrack = null
+                framesWritten = 0L
                 currentSampleRate = -1
                 currentChannels = -1
                 currentFormat = null
@@ -202,6 +220,7 @@ class AudioEngine(
                 try {
                     it.pause()
                     it.flush()
+                    framesWritten = 0L
                 } catch (e: IllegalStateException) {
                     Log.w(TAG, "pause() failed", e)
                 }
@@ -233,6 +252,7 @@ class AudioEngine(
             audioTrack?.let {
                 try {
                     it.flush()
+                    framesWritten = 0L
                 } catch (e: IllegalStateException) {
                     Log.w(TAG, "flush() failed", e)
                 }
@@ -249,6 +269,14 @@ class AudioEngine(
      * Called from rust trampoline when the PCMBuffer is filled with PCM.
      */
     fun onPcmReady(size: Int, sampleRate: Int, channels: Int) {
+        if (!promotedThread.get()!!) {
+            promotedThread.set(true)
+            try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO)
+            } catch (e: Exception) {
+                Log.w(TAG, "could not raise the decoder thread priority", e)
+            }
+        }
         writeLock.withLock {
             if (outputPaused || !stateHolder.localPlaybackAllowed || !stateHolder.playbackIntent.canPlay) return
             pcmBuffer.order(ByteOrder.nativeOrder())
@@ -343,10 +371,26 @@ class AudioEngine(
 
     private fun writeToTrack(buffer: ByteBuffer, size: Int, track: AudioTrack) {
         val written = track.write(buffer, size, AudioTrack.WRITE_BLOCKING)
+        if (written > 0) framesWritten += written / frameBytes
         if (written < 0) {
             Log.e(TAG, "AudioTrack.write returned error: $written")
         } else if (written < size) {
             Log.w(TAG, "AudioTrack wrote $written / $size bytes (partial write)")
+        }
+    }
+
+    /**
+     * Audio already written but not yet heard. librespot reports the decoder's position, which runs
+     * ahead of the speaker by this much, so callers subtract it to keep lyrics and progress in sync.
+     */
+    fun pendingOutputMs(): Long {
+        val track = audioTrack ?: return 0L
+        val rate = currentSampleRate.takeIf { it > 0 } ?: return 0L
+        return try {
+            val head = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+            ((framesWritten - head) * 1000 / rate).coerceIn(0L, OUTPUT_BUFFER_MS * 3L)
+        } catch (e: IllegalStateException) {
+            0L
         }
     }
 
