@@ -1,5 +1,16 @@
 package app.musique.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import app.musique.ui.components.bottomsheet.TonalPillButton
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -32,46 +42,54 @@ fun ErrorScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(horizontal = 40.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = Icons.Default.Warning,
-            contentDescription = stringResource(R.string.common_error),
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.error,
-        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .background(MusiqueColors.card)
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.WifiOff,
+                contentDescription = stringResource(R.string.common_error),
+                modifier = Modifier.size(32.dp),
+                tint = MusiqueColors.textTertiary,
+            )
+        }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
         Text(
             text = stringResource(R.string.error_something_went_wrong),
-            style = MaterialTheme.typography.titleLarge,
+            style = MusiqueType.sectionTitle,
+            color = MusiqueColors.textPrimary,
             textAlign = TextAlign.Center,
         )
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
 
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MusiqueType.body,
+            color = MusiqueColors.textTertiary,
             textAlign = TextAlign.Center,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
         )
 
         if (onRetry != null) {
             Spacer(Modifier.height(24.dp))
 
-            Button(onClick = onRetry) {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.common_retry))
-            }
+            TonalPillButton(
+                text = stringResource(R.string.common_retry),
+                icon = Icons.Rounded.Refresh,
+                onClick = onRetry,
+                modifier = Modifier.widthIn(max = 180.dp)
+            )
         }
     }
 }
