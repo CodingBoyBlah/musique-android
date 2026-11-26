@@ -37,3 +37,6 @@ GEMINI.md
 task_plan.md
 findings.md
 progress.md
+
+# Kotlin compiler state
+.kotlin/
