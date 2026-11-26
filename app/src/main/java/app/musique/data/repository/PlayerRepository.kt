@@ -7,6 +7,9 @@ import app.musique.core.model.LyricsResponse
 import app.musique.core.model.RawLyricSyllable
 import app.musique.core.model.Track
 import app.musique.data.remote.LrcLibClient
+import app.musique.data.remote.WordLyricsClient
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -21,15 +24,35 @@ class PlayerRepository @Inject constructor(
     private val json: Json,
     private val settingsRepository: SettingsRepository,
     private val lrcLibClient: LrcLibClient,
+    private val wordLyricsClient: WordLyricsClient,
 ) {
-    suspend fun getLyrics(track: Track?, timeoutMs: Long = 2000L): List<LyricLine> {
-        val spotifyLyrics = getSpotifyLyrics(track, timeoutMs)
-        if (track == null) return spotifyLyrics
-        if (spotifyLyrics.isNotEmpty() && spotifyLyrics.any { it.synced }) return spotifyLyrics
-        if (!settingsRepository.lyricsFallbackEnabled.first()) return spotifyLyrics
+    /**
+     * Same preference as the desktop app: hand aligned word timings (AMLL, keyed by this exact
+     * recording) first, then Apple Music's word timed text, then Spotify, then LRCLIB. The word
+     * sources race Spotify so the common case costs one round trip.
+     */
+    suspend fun getLyrics(track: Track?, timeoutMs: Long = 2000L): List<LyricLine> = coroutineScope {
+        if (track == null) return@coroutineScope emptyList()
+        val amll = async { wordLyricsClient.amll(track) }
+        val apple = async { wordLyricsClient.betterLyrics(track) }
+        val spotify = async { getSpotifyLyrics(track, timeoutMs) }
+
+        fun List<LyricLine>.synced() = isNotEmpty() && any { it.synced }
+        fun List<LyricLine>.wordLevel() = synced() && count { !it.words.isNullOrEmpty() } * 2 >= count { it.synced }
+
+        amll.await().takeIf { it.synced() }?.let { apple.cancel(); spotify.cancel(); return@coroutineScope it }
+        val appleLines = apple.await()
+        if (appleLines.wordLevel()) {
+            spotify.cancel()
+            return@coroutineScope appleLines
+        }
+        val spotifyLines = spotify.await()
+        if (spotifyLines.synced()) return@coroutineScope spotifyLines
+        if (appleLines.synced()) return@coroutineScope appleLines
+        if (!settingsRepository.lyricsFallbackEnabled.first()) return@coroutineScope spotifyLines
 
         val fallback = lrcLibClient.getLyrics(track)
-        return if (fallback.isNotEmpty()) fallback else spotifyLyrics
+        if (fallback.isNotEmpty()) fallback else spotifyLines
     }
 
     private suspend fun getSpotifyLyrics(track: Track?, timeoutMs: Long): List<LyricLine> =
