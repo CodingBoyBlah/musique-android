@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Material3Expressive" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Musique is dark only, like Cider: no white flash before Compose draws. -->
+    <style name="Theme.Musique" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/musique_canvas</item>
+        <item name="android:colorBackground">@color/musique_canvas</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
 </resources>

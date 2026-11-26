@@ -183,6 +183,11 @@ class MainActivity : ComponentActivity() {
         volumeController.start()
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Dark only: light status and navigation bar icons whatever the system theme is.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
 
         intent?.data?.let {
             deepLinkFlow.tryEmit(it)
@@ -373,6 +378,7 @@ class MainActivity : ComponentActivity() {
             staticAccentColor = interfaceSettings.accentColor,
             pureBlack = interfaceSettings.pureBlack,
             highContrastCompat = interfaceSettings.highContrastCompat,
+            darkTheme = true,
             content = {
                 if (!onboardingComplete) {
                     OnboardingScreen(viewModel = onboardingViewModel)
