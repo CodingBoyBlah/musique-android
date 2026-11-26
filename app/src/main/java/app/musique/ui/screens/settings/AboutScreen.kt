@@ -58,7 +58,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.compositeOver
@@ -74,7 +74,8 @@ import app.musique.MyIcons
 import app.musique.R
 import app.musique.ScreenBottomPadding
 import app.musique.ui.viewmodel.AboutViewModel
-import app.musique.ui.viewmodel.UpdateState
+import app.musique.core.update.AppRelease
+import app.musique.core.update.UpdateState
 
 private const val DEVELOPER = "TomKo"
 private const val GITHUB_URL = "https://github.com/CodingBoyBlah/musique-android"
@@ -99,7 +100,7 @@ fun AboutScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenUrl: (String) -> Unit = {},
-    viewModel: AboutViewModel = viewModel(),
+    viewModel: AboutViewModel = hiltViewModel(),
 ) {
     val updateState by viewModel.updateState.collectAsState()
     SettingsScaffold(
@@ -130,7 +131,7 @@ fun AboutScreen(
                         UpdateButton(
                             state = updateState,
                             onCheck = viewModel::checkForUpdates,
-                            onDownload = onOpenUrl,
+                            onDownload = viewModel::install,
                         )
                     }
                 )
@@ -200,10 +201,12 @@ private fun Hero(modifier: Modifier = Modifier) {
 private fun UpdateButton(
     state: UpdateState,
     onCheck: () -> Unit,
-    onDownload: (String) -> Unit,
+    onDownload: (AppRelease) -> Unit,
 ) {
-    val available = state as? UpdateState.Available
-    val checking = state is UpdateState.Checking
+    val available = (state as? UpdateState.Available)?.release
+        ?: (state as? UpdateState.Error)?.release
+    val checking = state is UpdateState.Checking || state is UpdateState.Downloading ||
+        state is UpdateState.Installing
 
     PillButton(
         text = stringResource(
@@ -211,7 +214,7 @@ private fun UpdateButton(
             else R.string.about_check_updates
         ),
         icon = if (available != null) Icons.Rounded.Download else Icons.Rounded.Refresh,
-        onClick = { if (available != null) onDownload(available.url) else onCheck() },
+        onClick = { if (available != null) onDownload(available) else onCheck() },
         enabled = !checking,
         loading = checking,
         modifier = Modifier.padding(top = 12.dp)
@@ -409,8 +412,18 @@ private fun UpdateRow(state: UpdateState) {
 
     when (state) {
         is UpdateState.Available -> {
-            title = stringResource(R.string.about_update_available, state.version)
-            supporting = stringResource(R.string.about_update_available_desc)
+            title = stringResource(R.string.about_update_available, state.release.version)
+            supporting = state.release.notes.ifBlank { stringResource(R.string.about_update_available_desc) }
+            icon = Icons.Rounded.SystemUpdate
+        }
+        is UpdateState.Downloading -> {
+            title = stringResource(R.string.update_downloading, (state.progress * 100).toInt())
+            supporting = null
+            icon = Icons.Rounded.SystemUpdate
+        }
+        is UpdateState.Installing -> {
+            title = stringResource(R.string.update_installing)
+            supporting = null
             icon = Icons.Rounded.SystemUpdate
         }
         is UpdateState.Error -> {

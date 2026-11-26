@@ -501,7 +501,14 @@
     <string name="about_up_to_date">You\'re up to date</string>
     <string name="about_update_available">Version %1$s is available</string>
     <string name="about_update_available_desc">Open the release page to download it</string>
-    <string name="about_update_download">Download</string>
+    <string name="about_update_download">Update</string>
+    <string name="update_downloading">Downloading update… %1$d%%</string>
+    <string name="update_installing">Installing update…</string>
+    <string name="update_prompt_title">Musique %1$s is here</string>
+    <string name="update_prompt_body">A new version of Musique is ready. It installs over this one and keeps your account and settings.</string>
+    <string name="update_now">Update</string>
+    <string name="update_later">Not now</string>
+    <string name="update_failed">The update could not be installed</string>
     <string name="about_update_error">Couldn\'t check for updates</string>
     <string name="common_repeat">Repeat</string>
     <string name="common_save">Save</string>
