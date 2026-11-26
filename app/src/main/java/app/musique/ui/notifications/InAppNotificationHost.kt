@@ -1,5 +1,13 @@
 package app.musique.ui.notifications
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
 import android.annotation.SuppressLint
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -162,18 +170,6 @@ private fun BannerLayout(
     val scope = rememberCoroutineScope()
     var measuredHeightPx by remember { mutableStateOf(0) }
 
-    val timerProgress = remember { Animatable(1f) }
-    LaunchedEffect(spec.id) {
-        timerProgress.snapTo(1f)
-        timerProgress.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(
-                durationMillis = spec.durationMillis.toInt(),
-                easing = LinearEasing
-            )
-        )
-    }
-
     val pointerModifier = Modifier.pointerInput(spec.id, spec.allowSwipeToDismiss) {
         if (!spec.allowSwipeToDismiss) return@pointerInput
         detectVerticalDragGestures(
@@ -231,49 +227,63 @@ private fun BannerLayout(
         )
     }
 
-    val backgroundColor = spec.backgroundColor ?: MaterialTheme.colorScheme.inverseSurface
-    val contentColor = spec.contentColor ?: MaterialTheme.colorScheme.inverseOnSurface
-    val timerColor = MaterialTheme.colorScheme.inversePrimary
+    val backgroundColor = spec.backgroundColor ?: MusiqueColors.chromeFloating
+    val contentColor = spec.contentColor ?: MusiqueColors.textPrimary
+    // A one line toast is a capsule; one carrying actions gets a softer rounded rect.
+    val shape = if (spec.actions != null) RoundedCornerShape(22.dp) else CircleShape
 
-    Surface(
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
             .padding(bottom = hostPaddingBottom)
             .fillMaxWidth(maxWidthFraction)
-            .graphicsLayer {
-                translationY = offsetY.value
-                scaleX = scale.value
-                scaleY = scale.value
-                this.alpha = alpha.value
-            }
-            .then(pointerModifier)
-            .onSizeMeasured { _, h ->
-                measuredHeightPx = h
-                onMeasured(h)
-            },
-        shape = RoundedCornerShape(24.dp),
-        color = backgroundColor,
-        tonalElevation = 6.dp,
-        shadowElevation = 10.dp,
     ) {
-        Column {
+        Surface(
+            modifier = Modifier
+                .graphicsLayer {
+                    translationY = offsetY.value
+                    scaleX = scale.value
+                    scaleY = scale.value
+                    this.alpha = alpha.value
+                }
+                .then(pointerModifier)
+                .onSizeMeasured { _, h ->
+                    measuredHeightPx = h
+                    onMeasured(h)
+                },
+            shape = shape,
+            color = backgroundColor,
+            contentColor = contentColor,
+            border = BorderStroke(1.dp, MusiqueColors.glassEdge),
+            shadowElevation = 16.dp,
+        ) {
             Row(
                 modifier = Modifier
-                    .padding(horizontal = 18.dp, vertical = 14.dp),
+                    .heightIn(min = 48.dp)
+                    .padding(
+                        start = if (spec.icon != null) 14.dp else 20.dp,
+                        end = 20.dp,
+                        top = 12.dp,
+                        bottom = 12.dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 spec.icon?.let { icon ->
-                    Box(contentAlignment = Alignment.Center) { icon() }
+                    CompositionLocalProvider(LocalContentColor provides contentColor) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.sizeIn(maxWidth = 24.dp, maxHeight = 24.dp)
+                        ) { icon() }
+                    }
                 }
 
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
                         text = spec.message,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MusiqueType.cardTitle.copy(fontSize = MusiqueType.miniSubtitle.fontSize * 1.08f),
                         color = contentColor,
+                        maxLines = 3,
                     )
                     spec.actions?.let { actions ->
                         Row(
@@ -283,20 +293,6 @@ private fun BannerLayout(
                         )
                     }
                 }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.5.dp)
-                    .background(contentColor.copy(alpha = 0.08f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(timerProgress.value)
-                        .fillMaxHeight()
-                        .background(timerColor.copy(alpha = 0.55f))
-                )
             }
         }
     }
