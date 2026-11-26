@@ -14,6 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.LocalIndication
+import app.musique.ui.theme.PressHighlight
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -142,8 +145,10 @@ fun MusiqueTheme(
     MaterialTheme(
         colorScheme = animatedScheme,
         typography = musiqueTypography(),
-        content = content
-    )
+    ) {
+        // MaterialTheme installs the ripple; swap in the Apple style press highlight under it
+        CompositionLocalProvider(LocalIndication provides PressHighlight, content = content)
+    }
 }
 
 @SuppressLint("RestrictedApi")

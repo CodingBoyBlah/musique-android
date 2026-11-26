@@ -17,8 +17,8 @@ object MusiqueMotion {
     /** Sheets opening and closing, shared bounds. Fast, no wobble. */
     fun <T> sheet() = spring<T>(dampingRatio = 0.88f, stiffness = 360f)
 
-    /** Button presses and toggles. A little bounce. */
-    fun <T> press() = spring<T>(dampingRatio = 0.6f, stiffness = 450f)
+    /** Button presses and toggles. Critically damped: a tap carries no momentum, so no bounce. */
+    fun <T> press() = spring<T>(dampingRatio = 1f, stiffness = 900f)
 
     /** Now Playing artwork shrinking on pause and growing on play. */
     fun <T> artwork() = spring<T>(dampingRatio = 0.72f, stiffness = 280f)

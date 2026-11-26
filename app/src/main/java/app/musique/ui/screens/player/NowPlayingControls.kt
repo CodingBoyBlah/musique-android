@@ -47,7 +47,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -115,7 +114,7 @@ internal fun PlayerIconButton(
             .background(background)
             .clickable(
                 interactionSource = interactionSource,
-                indication = ripple(bounded = true),
+                indication = null,
                 enabled = enabled,
                 onClick = onClick,
             ),
@@ -547,7 +546,7 @@ internal fun NowPlayingTransport(
                     )
                     .clickable(
                         interactionSource = sources[index],
-                        indication = ripple(),
+                        indication = null,
                         enabled = enabled,
                         onClick = button.onClick,
                     ),
