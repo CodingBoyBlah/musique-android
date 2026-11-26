@@ -509,7 +509,7 @@ internal fun NowPlayingTransport(
     val pressedIndex = pressed.indexOf(true)
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
@@ -522,7 +522,13 @@ internal fun NowPlayingTransport(
                 else -> button.baseWeight - 0.08f / (buttons.size - 1)
             }
             val weight by animateFloatAsState(target, MusiqueMotion.press(), label = "transportWeight")
-            val shape: Shape = if (button.primary) MusiqueShapes.transportMain else MusiqueShapes.transportSide
+            // Cider reads as one segmented control: round outer ends, tight inner corners.
+            val shape: Shape = when {
+                button.primary -> MusiqueShapes.transportMain
+                index == 0 -> MusiqueShapes.transportStart
+                index == buttons.lastIndex -> MusiqueShapes.transportEnd
+                else -> MusiqueShapes.transportInner
+            }
             val enabled = !button.primary || iconState != TransportIcon.Unavailable
             Box(
                 contentAlignment = Alignment.Center,

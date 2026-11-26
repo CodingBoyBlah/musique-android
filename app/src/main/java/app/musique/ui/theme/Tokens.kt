@@ -57,7 +57,11 @@ object MusiqueShapes {
     val artworkMini = RoundedCornerShape(10.dp)
     val artworkHero = RoundedCornerShape(10.dp)
     val transportSide = RoundedCornerShape(24.dp)
-    val transportMain = RoundedCornerShape(26.dp)
+    val transportMain = RoundedCornerShape(18.dp)
+    /** Prev button: fully round outer end, tight corners towards the play button. */
+    val transportStart = RoundedCornerShape(topStart = 40.dp, bottomStart = 40.dp, topEnd = 12.dp, bottomEnd = 12.dp)
+    val transportEnd = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp, topEnd = 40.dp, bottomEnd = 40.dp)
+    val transportInner = RoundedCornerShape(12.dp)
     val actionButton = RoundedCornerShape(16.dp)
     val searchField = RoundedCornerShape(12.dp)
     val sheetTop = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
