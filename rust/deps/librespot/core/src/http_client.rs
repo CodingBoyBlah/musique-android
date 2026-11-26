@@ -178,6 +178,11 @@ impl HttpClient {
             .get_or_init(|| Self::try_create_hyper_client(self.proxy_url.as_ref()).unwrap())
     }
 
+    async fn send_once(&self, req: Request<Bytes>) -> Result<Response<Incoming>, Error> {
+        let request = self.request_fut(req)?;
+        Ok(request.await?)
+    }
+
     pub async fn request(&self, req: Request<Bytes>) -> Result<Response<Incoming>, Error> {
         debug!("Requesting {}", req.uri());
 
@@ -194,35 +199,45 @@ impl HttpClient {
                 .body(body_as_bytes.clone())?;
             *req.headers_mut() = parts.headers.clone();
 
-            let request = self.request_fut(req)?;
-            let response = request.await;
+            let response = self.send_once(req).await?;
+            let code = response.status();
 
-            if let Ok(response) = &response {
-                let code = response.status();
-
-                if code == StatusCode::TOO_MANY_REQUESTS {
-                    if let Some(duration) = Self::get_retry_after(response.headers()) {
-                        warn!(
-                            "Rate limited by service, retrying in {} seconds...",
-                            duration.as_secs()
-                        );
-                        tokio::time::sleep(duration).await;
-                        continue;
-                    }
-                }
-
-                if !code.is_success() {
-                    return Err(HttpClientError::StatusCode(code).into());
+            if code == StatusCode::TOO_MANY_REQUESTS {
+                if let Some(duration) = Self::get_retry_after(response.headers()) {
+                    warn!(
+                        "Rate limited by service, retrying in {} seconds...",
+                        duration.as_secs()
+                    );
+                    tokio::time::sleep(duration).await;
+                    continue;
                 }
             }
 
-            let response = response?;
+            if !code.is_success() {
+                return Err(HttpClientError::StatusCode(code).into());
+            }
+
             return Ok(response);
         }
     }
 
+    pub async fn request_once(&self, req: Request<Bytes>) -> Result<Response<Incoming>, Error> {
+        debug!("Requesting once {}", req.uri());
+        let response = self.send_once(req).await?;
+        let code = response.status();
+        if !code.is_success() {
+            return Err(HttpClientError::StatusCode(code).into());
+        }
+        Ok(response)
+    }
+
     pub async fn request_body(&self, req: Request<Bytes>) -> Result<Bytes, Error> {
         let response = self.request(req).await?;
+        Ok(response.into_body().collect().await?.to_bytes())
+    }
+
+    pub async fn request_body_once(&self, req: Request<Bytes>) -> Result<Bytes, Error> {
+        let response = self.request_once(req).await?;
         Ok(response.into_body().collect().await?.to_bytes())
     }
 
@@ -297,5 +312,69 @@ impl HttpClient {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
+
+    #[tokio::test]
+    async fn request_body_once_returns_body_on_success_and_never_retries_on_429() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = socket.read(&mut buf).await.unwrap();
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+                .await
+                .unwrap();
+            socket.shutdown().await.unwrap();
+        });
+
+        let client = HttpClient::new(None);
+        let req = Request::builder()
+            .method(http::Method::GET)
+            .uri(format!("http://{addr}/ok"))
+            .body(Bytes::new())
+            .unwrap();
+        let body = client.request_body_once(req).await.unwrap();
+        assert_eq!(body.as_ref(), b"ok");
+        server.await.unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 4096];
+            let _ = socket.read(&mut buf).await.unwrap();
+            socket
+                .write_all(
+                    b"HTTP/1.1 429 Too Many Requests\r\nRetry-After: 0\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
+                .await
+                .unwrap();
+            socket.shutdown().await.unwrap();
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), listener.accept())
+                    .await
+                    .is_err()
+            );
+        });
+
+        let req = Request::builder()
+            .method(http::Method::POST)
+            .uri(format!("http://{addr}/limited"))
+            .body(Bytes::from_static(b"{}"))
+            .unwrap();
+        let err = client.request_body_once(req).await.unwrap_err();
+        assert_eq!(err.kind, crate::error::ErrorKind::ResourceExhausted);
+        server.await.unwrap();
     }
 }
