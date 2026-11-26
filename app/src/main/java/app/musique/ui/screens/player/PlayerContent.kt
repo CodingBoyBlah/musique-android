@@ -1,20 +1,20 @@
 package app.musique.ui.screens.player
 
 import android.content.res.Configuration
-import androidx.compose.animation.AnimatedContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,89 +23,57 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayDisabled
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MaterialTheme.motionScheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.musique.ALBUM_COVER_URL
 import app.musique.R
 import app.musique.core.model.Artist
 import app.musique.core.model.CoverSize
 import app.musique.core.model.Episode
-import app.musique.core.model.PlayableAudio
 import app.musique.core.model.getCover
-import app.musique.data.setting.LocalUiSettings
-import app.musique.playback.model.RepeatMode
 import app.musique.ui.GlobalPopupController
-import app.musique.ui.Haptics
 import app.musique.ui.PopupSpec
-import app.musique.ui.components.DraggableMarquee
 import app.musique.ui.components.SmartImage
-import app.musique.ui.components.ToggleSegmentButton
-import app.musique.ui.components.WavyMusicSlider
+import app.musique.ui.lyrics.SyncedLyricsView
 import app.musique.ui.model.player.PlayerAction
+import app.musique.ui.theme.LocalNowPlayingPalette
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueMotion
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.viewmodel.player.PlaybackContextLabel
 import app.musique.ui.viewmodel.player.PlayerViewModel
-import kotlinx.coroutines.launch
-import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
+import kotlinx.coroutines.delay
+
+/** How long the lyrics mode controls stay up after the last interaction while playing. */
+private const val ControlsIdleMs = 3_000L
+/** Height of the lyrics mode header row (thumbnail, title, buttons). */
+private val LyricsHeaderHeight = 72.dp
 
 @Composable
 fun PlayerContent(
@@ -118,169 +86,148 @@ fun PlayerContent(
     paddingValues: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val view = LocalView.current
-
     val audio by viewModel.currentAudio.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
-    val isShuffling by viewModel.isShuffling.collectAsState()
-    val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle(initialValue = RepeatMode.NONE)
-    val isFavorite by viewModel.isLiked.collectAsState()
+    val isLiked by viewModel.isLiked.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val elapsedMs by viewModel.positionMs.collectAsStateWithLifecycle()
     val forwardMilliseconds by viewModel.forwardMilliseconds.collectAsState(15_000)
+    val contextLabel by viewModel.playbackContextLabel.collectAsStateWithLifecycle()
+    val bitrateKbps by viewModel.audioBitrateKbps.collectAsStateWithLifecycle()
+    val isRemote by viewModel.isRemotePlayback.collectAsStateWithLifecycle()
 
+    val palette = LocalNowPlayingPalette.current
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val artistTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val isEpisode = audio?.isEpisode() ?: false
+    val track = audio?.sourceTrack
 
-    val albumCoverSection: @Composable (Modifier) -> Unit = { modifier ->
-        AlbumCoverContent(
-            audio = audio,
-            isPlaying = isPlaying,
-            playbackSpeed = uiState.playbackSpeed,
-            setPlaybackSpeed = viewModel::setPlaybackSpeed,
-            modifier = modifier,
-        )
+    var lyricsMode by rememberSaveable { mutableStateOf(false) }
+    val canShowLyrics = !isEpisode && track != null
+    LaunchedEffect(canShowLyrics) { if (!canShowLyrics) lyricsMode = false }
+    BackHandler(enabled = lyricsMode) { lyricsMode = false }
+
+    val artworkUrl = audio?.getCover(CoverSize.LARGE)?.uri?.let { ALBUM_COVER_URL + it }
+    val contextName = when (val label = contextLabel) {
+        PlaybackContextLabel.LikedSongs -> stringResource(R.string.common_liked_songs)
+        is PlaybackContextLabel.Named -> label.title
+        null -> track?.album?.name ?: audio?.showName
     }
+    val qualityLabel = bitrateKbps?.let { stringResource(R.string.player_audio_quality_ogg, it) }
 
-    val playerProgressSection: @Composable (landscape: Boolean) -> Unit = { landscape ->
-        PlayerProgressContent(
-            elapsed = elapsedMs,
-            duration = audio?.duration ?: 0L,
-            isPlaying = isPlaying,
-            onSeek = {
-                viewModel.onAction(PlayerAction.SeekTo(it))
-            },
-            textStyle = if (landscape) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium
-        )
+    val onMoreClick: (() -> Unit)? = track?.let { t ->
+        { GlobalPopupController.show(PopupSpec.TrackInfo(t, isLiked = isLiked)) }
     }
+    val onToggleFavorite: (() -> Unit)? = if (track != null) viewModel::toggleFavorite else null
 
-    val controlsSection: @Composable (height: Dp) -> Unit = { height ->
-        PlayerControlsContent(
-            isShuffleEnabled = isShuffling,
-            repeatMode = repeatMode,
-            isFavorite = isFavorite,
-            onShuffleToggle = {
-                viewModel.onAction(PlayerAction.ShuffleToggle)
-                Haptics.toggle(context, view)
-            },
-            onRepeatToggle = {
-                viewModel.onAction(PlayerAction.RepeatToggle)
-                Haptics.toggle(context, view)
-            },
-            onFavoriteToggle = {
-                viewModel.toggleFavorite()
-                Haptics.toggle(context, view)
-            },
-            height = height,
-        )
-    }
-
-    val moreActions: @Composable () -> Unit = {
-        MoreActionsSection(
-            onQueueClick = { onShowQueue() },
-            onLyricsClick = { GlobalPopupController.show(PopupSpec.Lyrics(audio!!.sourceTrack!!)) },
-            onMoreClick = {
-                GlobalPopupController.show(
-                    PopupSpec.TrackInfo(
-                        audio!!.sourceTrack!!,
-                        isLiked = isFavorite
-                    )
+    val chrome = PlayerChrome(
+        titleRow = { compact, rowModifier ->
+            NowPlayingTitleRow(
+                audio = audio,
+                isLiked = isLiked,
+                isPlaying = isPlaying,
+                expansionFractionProvider = expansionFractionProvider,
+                onArtistClick = onArtistClick,
+                onShowClick = onShowClick,
+                onToggleFavorite = onToggleFavorite,
+                onMoreClick = onMoreClick,
+                compact = compact,
+                modifier = rowModifier,
+            )
+        },
+        speedControl = {
+            if (isEpisode) {
+                PlaybackSpeedControl(
+                    currentSpeed = uiState.playbackSpeed,
+                    onSpeedChange = viewModel::setPlaybackSpeed,
                 )
             }
-        )
-    }
-
-    val playbackControls: @Composable (height: Dp) -> Unit = { height ->
-        PlaybackControls(
-            onPrevious = { viewModel.onAction(PlayerAction.Previous) },
-            onNext = { viewModel.onAction(PlayerAction.Next) },
-            onRewind = {
-                val position = (elapsedMs - forwardMilliseconds).coerceAtLeast(0)
-                viewModel.onAction(PlayerAction.SeekTo(position))
-            },
-            onFastForward = {
-                val position = (elapsedMs + forwardMilliseconds).coerceAtMost(uiState.totalLengthMs)
-                viewModel.onAction(PlayerAction.SeekTo(position))
-            },
-            onPlayPause = { viewModel.onAction(PlayerAction.PlayPause) },
-            canFastForward = forwardMilliseconds > 0,
-            isAudioSet = audio != null,
-            isBuffering = uiState.isBuffering,
-            isPlaying = isPlaying,
-            height = height,
-        )
-    }
-
-    val trackMetadataSection: @Composable (landscape: Boolean) -> Unit = { landscape ->
-        AudioMetadataSection(
-            audio = audio,
-            textColor = textColor,
-            artistTextColor = artistTextColor,
-            onArtistClick = onArtistClick,
-            onShowClick = onShowClick,
-            expansionFractionProvider = expansionFractionProvider,
-            isPlaying = isPlaying,
-            titleStyle = if (landscape) {
-                MaterialTheme.typography.bodyLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = textColor
-                )
-            } else {
-                MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = textColor
-                )
-            },
-            artistStyle = if (landscape) {
-                MaterialTheme.typography.bodySmall.copy(
-                    letterSpacing = 0.sp,
-                    color = artistTextColor
-                )
-            } else {
-                MaterialTheme.typography.titleMedium.copy(
-                    letterSpacing = 0.sp,
-                    color = artistTextColor
-                )
-            },
-        )
-    }
+        },
+        scrubber = {
+            NowPlayingScrubber(
+                elapsedMs = elapsedMs,
+                durationMs = audio?.duration ?: 0L,
+                isPlaying = isPlaying,
+                qualityLabel = qualityLabel,
+                onSeek = { viewModel.onAction(PlayerAction.SeekTo(it)) },
+            )
+        },
+        transport = { height ->
+            val canSeek = isEpisode && forwardMilliseconds > 0
+            NowPlayingTransport(
+                isAudioSet = audio != null,
+                isBuffering = uiState.isBuffering,
+                isPlaying = isPlaying,
+                onPrevious = { viewModel.onAction(PlayerAction.Previous) },
+                onNext = { viewModel.onAction(PlayerAction.Next) },
+                onPlayPause = { viewModel.onAction(PlayerAction.PlayPause) },
+                onRewind = if (canSeek) {
+                    {
+                        val position = (elapsedMs - forwardMilliseconds).coerceAtLeast(0)
+                        viewModel.onAction(PlayerAction.SeekTo(position))
+                    }
+                } else null,
+                onForward = if (canSeek) {
+                    {
+                        val position = (elapsedMs + forwardMilliseconds).coerceAtMost(uiState.totalLengthMs)
+                        viewModel.onAction(PlayerAction.SeekTo(position))
+                    }
+                } else null,
+                height = height,
+            )
+        },
+        drawer = { bottomInset, rounded ->
+            NowPlayingDrawer(
+                contextName = contextName,
+                showLyricsButton = canShowLyrics,
+                lyricsActive = lyricsMode,
+                isRemotePlayback = isRemote,
+                onLyricsClick = { lyricsMode = !lyricsMode },
+                onDevicesClick = viewModel::openDevices,
+                onQueueClick = onShowQueue,
+                bottomInset = bottomInset,
+                shape = if (rounded) MusiqueShapes.sheetTop else MusiqueShapes.actionButton,
+                showHandle = rounded,
+            )
+        },
+    )
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val itemHeight = maxHeight
+        val viewportHeight = maxHeight
 
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            item {
-                val itemModifier = Modifier.height(itemHeight)
-                val isEpisode = audio?.isEpisode() ?: false
+        NowPlayingBackdrop(palette = palette, isPlaying = isPlaying)
 
-                if (isLandscape) {
-                    FullPlayerLandscapeContent(
-                        paddingValues,
-                        modifier = itemModifier,
-                        albumCoverSection = albumCoverSection,
-                        trackMetadataSection = { trackMetadataSection(true) },
-                        playerProgressSection = { playerProgressSection(true) },
-                        playbackControlsSection = playbackControls,
-                        controlsSection = controlsSection,
-                        moreActions = moreActions,
-                        isEpisode = isEpisode
-                    )
-                } else {
-                    FullPlayerPortraitContent(
-                        paddingValues,
-                        modifier = itemModifier,
-                        albumCoverSection = albumCoverSection,
-                        trackMetadataSection = { trackMetadataSection(false) },
-                        playerProgressSection = { playerProgressSection(false) },
-                        playbackControlsSection = playbackControls,
-                        controlsSection = controlsSection,
-                        moreActions = moreActions,
-                        isEpisode = isEpisode
+        if (isLandscape) {
+            LandscapeNowPlaying(
+                chrome = chrome,
+                artworkUrl = artworkUrl,
+                isPlaying = isPlaying,
+                lyricsMode = lyricsMode,
+                onExitLyrics = { lyricsMode = false },
+                paddingValues = paddingValues,
+            )
+        } else {
+            // A 1dp lead item lets lyrics mode park the list off its first item, so the sheet's
+            // drag-to-dismiss doesn't take lyrics scrolls before the lyrics list sees them.
+            LaunchedEffect(lyricsMode) {
+                if (lyricsMode) listState.scrollToItem(1) else listState.scrollToItem(0)
+            }
+            LazyColumn(
+                state = listState,
+                userScrollEnabled = !lyricsMode,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                item(key = "lead") { Spacer(Modifier.height(1.dp)) }
+                item(key = "player") {
+                    PortraitNowPlaying(
+                        chrome = chrome,
+                        artworkUrl = artworkUrl,
+                        isPlaying = isPlaying,
+                        lyricsMode = lyricsMode,
+                        onExitLyrics = { lyricsMode = false },
+                        paddingValues = paddingValues,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(viewportHeight),
                     )
                 }
             }
@@ -288,756 +235,268 @@ fun PlayerContent(
     }
 }
 
-@Composable
-private fun AlbumCoverContent(
-    audio: PlayableAudio?,
-    isPlaying: Boolean,
-    playbackSpeed: Float,
-    setPlaybackSpeed: (Float) -> Unit,
-    modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant
-) {
-    val artworkUrl = audio?.getCover(CoverSize.LARGE)?.uri?.let { ALBUM_COVER_URL + it }
+/** The pieces of Now Playing, shared by the portrait and landscape layouts. */
+private class PlayerChrome(
+    val titleRow: @Composable (compact: Boolean, modifier: Modifier) -> Unit,
+    val speedControl: @Composable () -> Unit,
+    val scrubber: @Composable () -> Unit,
+    val transport: @Composable (height: Dp) -> Unit,
+    val drawer: @Composable (bottomInset: Dp, rounded: Boolean) -> Unit,
+)
 
-    val imageScale by animateFloatAsState(
-        targetValue = if (isPlaying) 1f else 0.95f,
-        animationSpec = motionScheme.defaultSpatialSpec(),
-        label = "albumArtScale"
-    )
+/**
+ * Lyrics mode controls auto hide: while playing they fade out after [ControlsIdleMs] without
+ * interaction; a hand scroll, a background tap or pausing brings them back. Never hidden while
+ * paused or outside lyrics mode.
+ */
+private class ControlsAutoHide {
+    var visible by mutableStateOf(true)
+    var userScrolling by mutableStateOf(false)
+    var wakeCount by mutableIntStateOf(0)
 
-    var showExtraSettings by remember { mutableStateOf(false) }
-
-    Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(containerColor)
-            .clickable {
-                showExtraSettings = !showExtraSettings
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        SmartImage(
-            url = artworkUrl,
-            monochrome = LocalUiSettings.current.monochromePlayer,
-            shape = RoundedCornerShape(18.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = imageScale
-                    scaleY = imageScale
-                }
-        )
-
-        AnimatedVisibility(visible = showExtraSettings) {
-            PlaybackSpeedControl(
-                currentSpeed = playbackSpeed,
-                onSpeedChange = setPlaybackSpeed,
-            )
-        }
+    fun wake() {
+        visible = true
+        wakeCount++
     }
 }
 
 @Composable
-private fun PlayerProgressContent(
-    elapsed: Long,
-    duration: Long,
-    isPlaying: Boolean,
-    onSeek: (Long) -> Unit,
-    textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
-) {
-    fun formatTime(ms: Long): String {
-        val s = (ms / 1000).coerceAtLeast(0L)
-        return "%02d:%02d".format(s / 60, s % 60)
-    }
-
-    var isDragging by remember { mutableStateOf(false) }
-    var targetSliderValue by remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(elapsed, duration, isDragging) {
-        if (!isDragging && duration > 0) {
-            targetSliderValue = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
+private fun rememberControlsAutoHide(lyricsMode: Boolean, isPlaying: Boolean): ControlsAutoHide {
+    val state = remember { ControlsAutoHide() }
+    LaunchedEffect(lyricsMode, isPlaying, state.userScrolling, state.wakeCount) {
+        if (!lyricsMode || !isPlaying || state.userScrolling) {
+            state.visible = true
+            return@LaunchedEffect
         }
+        delay(ControlsIdleMs)
+        state.visible = false
+    }
+    return state
+}
+
+@Composable
+private fun PortraitNowPlaying(
+    chrome: PlayerChrome,
+    artworkUrl: String?,
+    isPlaying: Boolean,
+    lyricsMode: Boolean,
+    onExitLyrics: () -> Unit,
+    paddingValues: PaddingValues,
+    modifier: Modifier = Modifier,
+) {
+    val density = LocalDensity.current
+    val statusTop = paddingValues.calculateTopPadding()
+    val bottomInset = paddingValues.calculateBottomPadding()
+    val side = MusiqueDimens.playerHorizontalPadding
+
+    val pausedFraction = remember { Animatable(if (isPlaying) 0f else 1f) }
+    LaunchedEffect(isPlaying) { pausedFraction.animateTo(if (isPlaying) 0f else 1f, MusiqueMotion.artwork()) }
+    val lyricsFraction = remember { Animatable(if (lyricsMode) 1f else 0f) }
+    LaunchedEffect(lyricsMode) {
+        lyricsFraction.animateTo(if (lyricsMode) 1f else 0f, spring(dampingRatio = 0.86f, stiffness = 360f))
     }
 
-    val animatedSliderValue by animateFloatAsState(
-        targetValue = targetSliderValue,
-        animationSpec = tween(durationMillis = 300),
-        label = "sliderAnimation"
-    )
+    val autoHide = rememberControlsAutoHide(lyricsMode, isPlaying)
+    // Height of the bottom chrome with the controls showing; the lyrics keep clear of it.
+    var bottomChromeHeight by remember { mutableStateOf(0.dp) }
 
-    val currentValue = if (isDragging) targetSliderValue else animatedSliderValue
+    val thumbX = 20.dp
+    val thumbY = statusTop + 12.dp + (LyricsHeaderHeight - 12.dp - MusiqueDimens.lyricsCompactArtSize) / 2
 
-    val displayedMs = (currentValue * duration).toLong().coerceIn(0L, duration)
+    BoxWithConstraints(modifier = modifier) {
+        val artworkSize = maxWidth
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+        if (lyricsMode || lyricsFraction.value > 0.01f) {
+            SyncedLyricsView(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = lyricsFraction.value },
+                contentPadding = PaddingValues(
+                    top = statusTop + LyricsHeaderHeight,
+                    bottom = bottomChromeHeight,
+                ),
+                onUserScrollingChange = { scrolling ->
+                    autoHide.userScrolling = scrolling
+                    if (scrolling) autoHide.wake()
+                },
+                onBackgroundTap = autoHide::wake,
+            )
+        }
+
+        NowPlayingArtwork(
+            artworkUrl = artworkUrl,
+            fullSize = artworkSize,
+            pausedTopInset = statusTop + 12.dp,
+            thumbX = thumbX,
+            thumbY = thumbY,
+            pausedFraction = { pausedFraction.value },
+            lyricsFraction = { lyricsFraction.value },
+        )
+
+        SheetGrabber(
             modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = statusTop + 6.dp)
+        )
+
+        AnimatedVisibility(
+            visible = lyricsMode,
+            enter = fadeIn(tween(220, delayMillis = 80)),
+            exit = fadeOut(tween(120)),
+            modifier = Modifier
+                .padding(top = statusTop + 12.dp)
                 .fillMaxWidth()
+                .height(LyricsHeaderHeight - 12.dp),
         ) {
-            Text(
-                text = formatTime(displayedMs),
-                style = textStyle,
-            )
-
-            Text(
-                text = formatTime(duration),
-                style = textStyle,
-            )
-        }
-        WavyMusicSlider(
-            value = currentValue,
-            onValueChange = {
-                isDragging = true
-                targetSliderValue = it.coerceIn(0f, 1f)
-            },
-            onValueChangeFinished = {
-                onSeek((targetSliderValue * duration).toLong().coerceIn(0L, duration))
-                isDragging = false
-            },
-            isPlaying = isPlaying
-        )
-    }
-}
-
-private enum class PlaybackIconState { Buffering, Playing, Paused, NotPlaying }
-
-private enum class PlaybackButtonType { NONE, REWIND, PREVIOUS, PLAY_PAUSE, NEXT, FAST_FORWARD }
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun PlayerControlsContent(
-    isShuffleEnabled: Boolean,
-    repeatMode: RepeatMode,
-    isFavorite: Boolean,
-    height: Dp,
-    onShuffleToggle: () -> Unit,
-    onRepeatToggle: () -> Unit,
-    onFavoriteToggle: () -> Unit,
-    modifier: Modifier = Modifier,
-    activeColorMain: Color = MaterialTheme.colorScheme.primary,
-    onActiveColorMain: Color = MaterialTheme.colorScheme.onPrimary,
-    inactiveColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    inactiveContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant
-) {
-    val rowCorners = 60.dp
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Spacer(Modifier.height(14.dp))
-
-        Box(
-            modifier = Modifier.height(height)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-                    .clip(
-                        AbsoluteSmoothCornerShape(
-                            cornerRadiusBL = rowCorners,
-                            smoothnessAsPercentTR = 60,
-                            cornerRadiusBR = rowCorners,
-                            smoothnessAsPercentBL = 60,
-                            cornerRadiusTL = rowCorners,
-                            smoothnessAsPercentBR = 60,
-                            cornerRadiusTR = rowCorners,
-                            smoothnessAsPercentTL = 60
-                        )
-                    )
-                    .background(containerColor)
-                    .padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val commonModifier = Modifier.weight(1f)
-
-                ToggleSegmentButton(
-                    modifier = commonModifier
-                        .clip(
-                            AbsoluteSmoothCornerShape(
-                                cornerRadiusBL = rowCorners,
-                                cornerRadiusBR = 0.dp,
-                                cornerRadiusTL = rowCorners,
-                                cornerRadiusTR = 0.dp,
-                            )
-                        ),
-                    active = isShuffleEnabled,
-                    activeColor = activeColorMain,
-                    activeCornerRadius = rowCorners,
-                    activeContentColor = onActiveColorMain,
-                    inactiveColor = inactiveColor,
-                    inactiveContentColor = inactiveContentColor,
-                    onClick = onShuffleToggle,
-                    iconId = R.drawable.shuffle,
-                    contentDesc = stringResource(R.string.common_shuffle)
-                )
-
-                ToggleSegmentButton(
-                    modifier = commonModifier
-                        .clip(
-                            AbsoluteSmoothCornerShape(
-                                cornerRadiusBL = 0.dp,
-                                cornerRadiusBR = 0.dp,
-                                cornerRadiusTL = 0.dp,
-                                cornerRadiusTR = 0.dp,
-                            )
-                        ),
-                    active = repeatMode != RepeatMode.NONE,
-                    activeColor = activeColorMain,
-                    activeCornerRadius = rowCorners,
-                    activeContentColor = onActiveColorMain,
-                    inactiveColor = inactiveColor,
-                    inactiveContentColor = inactiveContentColor,
-                    onClick = onRepeatToggle,
-                    imageVector = if (!repeatMode.repeatTrack) Icons.Default.Repeat else Icons.Default.RepeatOne,
-                    contentDesc = stringResource(R.string.common_repeat)
-                )
-
-                ToggleSegmentButton(
-                    modifier = commonModifier
-                        .clip(
-                            AbsoluteSmoothCornerShape(
-                                cornerRadiusBR = rowCorners,
-                                cornerRadiusBL = 0.dp,
-                                cornerRadiusTR = rowCorners,
-                                cornerRadiusTL = 0.dp,
-                            )
-                        ),
-                    active = isFavorite,
-                    activeColor = activeColorMain,
-                    activeCornerRadius = rowCorners,
-                    activeContentColor = onActiveColorMain,
-                    inactiveColor = inactiveColor,
-                    inactiveContentColor = inactiveContentColor,
-                    onClick = onFavoriteToggle,
-                    imageVector = Icons.Default.Favorite,
-                    contentDesc = stringResource(R.string.cd_favorite)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MoreActionsSection(
-    onQueueClick: () -> Unit,
-    onLyricsClick: () -> Unit,
-    onMoreClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(containerColor)
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onLyricsClick) {
-                Icon(
-                    imageVector = Icons.Default.Lyrics,
-                    contentDescription = stringResource(R.string.common_lyrics),
-                    tint = contentColor
-                )
-            }
-
-            IconButton(onClick = onQueueClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.QueueMusic,
-                    contentDescription = stringResource(R.string.common_queue),
-                    tint = contentColor
-                )
-            }
-
-            IconButton(onClick = onMoreClick) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = stringResource(R.string.about_more_information),
-                    tint = contentColor
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun PlaybackControls(
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onRewind: () -> Unit,
-    onFastForward: () -> Unit,
-    onPlayPause: () -> Unit,
-    canFastForward: Boolean,
-    isAudioSet: Boolean,
-    isBuffering: Boolean,
-    isPlaying: Boolean,
-    modifier: Modifier = Modifier,
-    height: Dp = 90.dp,
-    baseWeight: Float = 1f,
-    expansionWeight: Float = 1.1f,
-    compressionWeight: Float = 0.65f,
-    pressAnimationSpec: AnimationSpec<Float> = spring(
-        Spring.DampingRatioMediumBouncy,
-        Spring.StiffnessMediumLow
-    ),
-) {
-    val iconState = when {
-        !isAudioSet -> PlaybackIconState.NotPlaying
-        isBuffering -> PlaybackIconState.Buffering
-        isPlaying -> PlaybackIconState.Playing
-        else -> PlaybackIconState.Paused
-    }
-
-    var lastClicked by remember {
-        mutableStateOf<PlaybackButtonType?>(null)
-    }
-
-    var clickTrigger by remember {
-        mutableIntStateOf(0)
-    }
-
-    val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current
-    val view = LocalView.current
-
-    LaunchedEffect(lastClicked, clickTrigger) {
-        lastClicked = null
-    }
-
-    fun weightFor(button: PlaybackButtonType): Float =
-        when (lastClicked) {
-            button -> expansionWeight
-            null -> baseWeight
-            else -> compressionWeight
-        }
-
-    val playPauseScale = 1.5f
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = height, max = height * playPauseScale)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Previous
-        val prevWeight by animateFloatAsState(
-            targetValue = weightFor(PlaybackButtonType.PREVIOUS),
-            animationSpec = pressAnimationSpec,
-            label = "prevWeight"
-        )
-
-        IconButton(
-            onClick = {
-                lastClicked = PlaybackButtonType.PREVIOUS
-                clickTrigger++
-
-                Haptics.textHandleMove(context, view)
-
-                coroutineScope.launch {
-                    onPrevious()
-                }
-            },
-            modifier = Modifier
-                .weight(prevWeight)
-                .wrapContentHeight()
-        ) {
-            Icon(
-                Icons.Default.SkipPrevious,
-                contentDescription = stringResource(R.string.common_previous)
-            )
-        }
-
-        // Rewind
-        if (canFastForward) {
-            val rewindWeight by animateFloatAsState(
-                targetValue = weightFor(PlaybackButtonType.REWIND),
-                animationSpec = pressAnimationSpec,
-                label = "rewindWeight"
-            )
-
-            IconButton(
-                onClick = {
-                    lastClicked = PlaybackButtonType.REWIND
-                    clickTrigger++
-
-                    Haptics.textHandleMove(context, view)
-
-                    coroutineScope.launch {
-                        onRewind()
-                    }
-                },
-                modifier = Modifier
-                    .weight(rewindWeight)
-                    .wrapContentHeight()
-            ) {
-                Icon(
-                    Icons.Default.FastRewind,
-                    contentDescription = stringResource(R.string.player_fr),
-                    modifier = Modifier.size(42.dp)
-                )
-            }
-        }
-
-        // Play / Pause
-        FilledIconButton(
-            onClick = {
-                lastClicked = PlaybackButtonType.PLAY_PAUSE
-                clickTrigger++
-
-                Haptics.textHandleMove(context, view)
-
-                onPlayPause()
-            },
-            shape = MaterialShapes.Cookie9Sided.toShape(),
-            modifier = Modifier
-                .size(height * playPauseScale)
-                .align(Alignment.CenterVertically),
-            enabled = iconState != PlaybackIconState.NotPlaying,
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                disabledContentColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
-                disabledContainerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.75f),
-            )
-        ) {
-            AnimatedContent(
-                targetState = iconState,
-                transitionSpec = {
-                    (
-                            scaleIn(
-                                spring(
-                                    Spring.DampingRatioMediumBouncy,
-                                    Spring.StiffnessMediumLow
-                                )
-                            ) + fadeIn()
-                            ) togetherWith (
-                            scaleOut() + fadeOut()
-                            )
-                },
-                label = "playPauseIcon"
-            ) { state ->
-                val padding = 8.dp
-                val iconSize = 56.dp
-
-                when (state) {
-                    PlaybackIconState.Buffering -> {
-                        LoadingIndicator(
-                            modifier = Modifier.size(48.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-
-                    PlaybackIconState.Playing -> {
-                        Icon(
-                            Icons.Outlined.Pause,
-                            contentDescription = stringResource(R.string.common_pause),
-                            modifier = Modifier
-                                .padding(padding)
-                                .size(iconSize)
-                        )
-                    }
-
-                    PlaybackIconState.Paused -> {
-                        Icon(
-                            Icons.Outlined.PlayArrow,
-                            contentDescription = stringResource(R.string.common_play),
-                            modifier = Modifier
-                                .padding(padding)
-                                .size(iconSize)
-                        )
-                    }
-
-                    PlaybackIconState.NotPlaying -> {
-                        Icon(
-                            Icons.Default.PlayDisabled,
-                            contentDescription = stringResource(R.string.player_play_not_available),
-                            modifier = Modifier
-                                .padding(padding)
-                                .size(iconSize / 2)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Fast forward
-        if (canFastForward) {
-            val ffWeight by animateFloatAsState(
-                targetValue = weightFor(PlaybackButtonType.FAST_FORWARD),
-                animationSpec = pressAnimationSpec,
-                label = "ffWeight"
-            )
-
-            IconButton(
-                onClick = {
-                    lastClicked = PlaybackButtonType.FAST_FORWARD
-                    clickTrigger++
-
-                    Haptics.textHandleMove(context, view)
-
-                    coroutineScope.launch {
-                        onFastForward()
-                    }
-                },
-                modifier = Modifier
-                    .weight(ffWeight)
-                    .wrapContentHeight()
-            ) {
-                Icon(
-                    Icons.Default.FastForward,
-                    contentDescription = stringResource(R.string.player_ff),
-                    modifier = Modifier.size(42.dp)
-                )
-            }
-        }
-
-        // Next
-        val nextWeight by animateFloatAsState(
-            targetValue = weightFor(PlaybackButtonType.NEXT),
-            animationSpec = pressAnimationSpec,
-            label = "nextWeight"
-        )
-
-        IconButton(
-            onClick = {
-                lastClicked = PlaybackButtonType.NEXT
-                clickTrigger++
-
-                Haptics.textHandleMove(context, view)
-
-                coroutineScope.launch {
-                    onNext()
-                }
-            },
-            modifier = Modifier
-                .weight(nextWeight)
-                .wrapContentHeight()
-        ) {
-            Icon(
-                Icons.Default.SkipNext,
-                contentDescription = stringResource(R.string.common_next)
-            )
-        }
-    }
-}
-
-@Composable
-private fun AudioMetadataSection(
-    audio: PlayableAudio?,
-    textColor: Color,
-    artistTextColor: Color,
-    onArtistClick: (Artist) -> Unit,
-    onShowClick: (Episode?) -> Unit,
-    expansionFractionProvider: () -> Float,
-    isPlaying: Boolean,
-    modifier: Modifier = Modifier,
-    titleStyle: TextStyle = MaterialTheme.typography.headlineSmall.copy(
-        fontWeight = FontWeight.Bold,
-        color = textColor,
-    ),
-    artistStyle: TextStyle = MaterialTheme.typography.titleMedium.copy(
-        letterSpacing = 0.sp,
-        color = artistTextColor
-    )
-) {
-    Column(
-        horizontalAlignment = Alignment.Start,
-        modifier = modifier
-            .padding(vertical = 4.dp)
-            .fillMaxWidth()
-            .graphicsLayer {
-                val fraction = expansionFractionProvider()
-                alpha = fraction
-                translationY = (1f - fraction) * 24f
-            }
-    ) {
-
-        DraggableMarquee(
-            contentKey = audio?.uri to audio?.name,
-            expansionFractionProvider = expansionFractionProvider,
-            canScroll = isPlaying,
-        ) {
-            Text(
-                text = audio?.name ?: "Not playing",
-                style = titleStyle,
-                maxLines = 1,
-                softWrap = false,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(2.dp))
-
-        val artists = audio?.artists.orEmpty()
-        val subtitle = artists.takeIf { it.isNotEmpty() }?.joinToString { it.name }
-            ?: audio?.showName
-            ?: stringResource(R.string.player_unknown_source)
-
-        DraggableMarquee(
-            contentKey = audio?.uri to subtitle,
-            expansionFractionProvider = expansionFractionProvider,
-            canScroll = isPlaying,
-        ) {
-            if (audio?.isEpisode() ?: true) {
-                Text(
-                    text = subtitle,
-                    style = artistStyle,
-                    maxLines = 1,
-                    softWrap = false,
-                    modifier = Modifier.clickable { onShowClick(audio?.sourceEpisode) },
-                )
-            } else if (artists.isEmpty()) {
-                Text(text = subtitle, style = artistStyle, maxLines = 1, softWrap = false)
-            } else {
-                artists.forEachIndexed { index, artist ->
-                    Text(
-                        text = artist.name + if (index < artists.lastIndex) ", " else "",
-                        style = artistStyle,
-                        maxLines = 1,
-                        softWrap = false,
-                        modifier = Modifier.clickable { onArtistClick(artist) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FullPlayerLandscapeContent(
-    paddingValues: PaddingValues,
-    modifier: Modifier = Modifier,
-    albumCoverSection: @Composable (Modifier) -> Unit,
-    trackMetadataSection: @Composable () -> Unit,
-    playerProgressSection: @Composable () -> Unit,
-    playbackControlsSection: @Composable (height: Dp) -> Unit,
-    controlsSection: @Composable (height: Dp) -> Unit,
-    moreActions: @Composable () -> Unit,
-    isEpisode: Boolean,
-) {
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
-    ) {
-        BoxWithConstraints(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(end = 12.dp)
-        ) {
-            val playbackControlsHeight = maxHeight * 0.17f
-            val segmentedControlsHeight = maxHeight * 0.05f
-            val artSize = minOf(maxWidth * 0.85f, maxHeight * 0.35f)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
+            Box(Modifier.fillMaxSize()) {
+                // Tapping the thumbnail goes back to the artwork.
                 Box(
-                    modifier = Modifier.size(artSize),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    albumCoverSection(Modifier.fillMaxSize())
-                }
-
-                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    trackMetadataSection()
-                    playerProgressSection()
-                }
-
-                playbackControlsSection(playbackControlsHeight)
-                controlsSection(segmentedControlsHeight)
-
-                if (!isEpisode) {
-                    moreActions()
-                }
+                        .offset(x = thumbX)
+                        .size(MusiqueDimens.lyricsCompactArtSize)
+                        .align(Alignment.CenterStart)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onExitLyrics,
+                        ),
+                )
+                chrome.titleRow(
+                    true,
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = thumbX + MusiqueDimens.lyricsCompactArtSize + 12.dp, end = 8.dp),
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun FullPlayerPortraitContent(
-    paddingValues: PaddingValues,
-    modifier: Modifier = Modifier,
-    albumCoverSection: @Composable (Modifier) -> Unit,
-    trackMetadataSection: @Composable () -> Unit,
-    playerProgressSection: @Composable () -> Unit,
-    playbackControlsSection: @Composable (height: Dp) -> Unit,
-    controlsSection: @Composable (height: Dp) -> Unit,
-    moreActions: @Composable () -> Unit,
-    isEpisode: Boolean,
-) {
-    BoxWithConstraints(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(paddingValues)
-    ) {
-        val horizontalPadding = maxWidth * 0.06f
-        val playbackControlsHeight = maxHeight * 0.12f
-        val segmentedControlsHeight = maxHeight * 0.1f
-        val artSize = minOf(maxWidth * 0.88f, maxHeight * 0.4f)
 
         Column(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = horizontalPadding),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .onSizeChanged {
+                    if (autoHide.visible) bottomChromeHeight = with(density) { it.height.toDp() }
+                },
         ) {
-            Box(
-                modifier = Modifier.size(artSize),
-                contentAlignment = Alignment.Center,
+            AnimatedVisibility(
+                visible = !lyricsMode,
+                enter = fadeIn(tween(220, delayMillis = 60)) + expandVertically(MusiqueMotion.sheet()),
+                exit = fadeOut(tween(120)) + shrinkVertically(MusiqueMotion.sheet()),
             ) {
-                albumCoverSection(Modifier.fillMaxSize())
+                Column(modifier = Modifier.padding(horizontal = side)) {
+                    chrome.titleRow(false, Modifier)
+                    Box(Modifier.padding(top = 8.dp)) { chrome.speedControl() }
+                }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = horizontalPadding * 0.65f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+            AnimatedVisibility(
+                visible = autoHide.visible,
+                enter = fadeIn(tween(120)) + slideInVertically(tween(120)) { with(density) { 10.dp.roundToPx() } },
+                exit = fadeOut(tween(400, easing = FastOutSlowInEasing)) +
+                    slideOutVertically(tween(400, easing = FastOutSlowInEasing)) { with(density) { 10.dp.roundToPx() } },
             ) {
-                trackMetadataSection()
-                playerProgressSection()
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = side)
+                        .padding(top = 12.dp, bottom = 20.dp),
+                ) {
+                    chrome.scrubber()
+                    Spacer(Modifier.height(18.dp))
+                    chrome.transport(MusiqueDimens.transportHeight)
+                }
             }
 
-            playbackControlsSection(playbackControlsHeight)
-            controlsSection(segmentedControlsHeight)
+            chrome.drawer(bottomInset, true)
+        }
+    }
+}
 
-            if (!isEpisode) {
-                moreActions()
+@Composable
+private fun LandscapeNowPlaying(
+    chrome: PlayerChrome,
+    artworkUrl: String?,
+    isPlaying: Boolean,
+    lyricsMode: Boolean,
+    onExitLyrics: () -> Unit,
+    paddingValues: PaddingValues,
+) {
+    val autoHide = rememberControlsAutoHide(lyricsMode, isPlaying)
+    val artworkScale = remember { Animatable(if (isPlaying) 1f else 0.9f) }
+    LaunchedEffect(isPlaying) { artworkScale.animateTo(if (isPlaying) 1f else 0.9f, MusiqueMotion.artwork()) }
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
+            if (lyricsMode) {
+                Column(Modifier.fillMaxSize()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SmartImage(
+                            url = artworkUrl,
+                            shape = MusiqueShapes.artworkSmall,
+                            modifier = Modifier
+                                .size(MusiqueDimens.lyricsCompactArtSize)
+                                .clickable(onClick = onExitLyrics),
+                        )
+                        Spacer(Modifier.size(12.dp))
+                        chrome.titleRow(true, Modifier.weight(1f))
+                    }
+                    SyncedLyricsView(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentPadding = PaddingValues(vertical = 12.dp),
+                        onUserScrollingChange = { scrolling ->
+                            autoHide.userScrolling = scrolling
+                            if (scrolling) autoHide.wake()
+                        },
+                        onBackgroundTap = autoHide::wake,
+                    )
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    SmartImage(
+                        url = artworkUrl,
+                        shape = MusiqueShapes.cardLarge,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .widthIn(max = 420.dp)
+                            .aspectRatio(1f)
+                            .graphicsLayer {
+                                scaleX = artworkScale.value
+                                scaleY = artworkScale.value
+                            },
+                    )
+                    chrome.titleRow(false, Modifier)
+                    chrome.speedControl()
+                }
             }
         }
+
+        AnimatedVisibility(
+            visible = autoHide.visible,
+            enter = fadeIn(tween(120)),
+            exit = fadeOut(tween(400)),
+        ) {
+            Column {
+                chrome.scrubber()
+                Spacer(Modifier.height(10.dp))
+                chrome.transport(64.dp)
+            }
+        }
+
+        chrome.drawer(0.dp, false)
     }
 }
