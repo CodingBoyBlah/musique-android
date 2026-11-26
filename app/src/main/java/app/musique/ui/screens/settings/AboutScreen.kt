@@ -59,6 +59,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.compositeOver
+import app.musique.ui.components.SettingsDefaults
+import app.musique.ui.components.SettingsDivider
+import app.musique.ui.components.SettingsScaffold
+import app.musique.ui.components.SettingsSectionHeader
+import app.musique.ui.components.bottomsheet.PillButton
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
 import app.musique.BuildConfig
 import app.musique.MyIcons
 import app.musique.R
@@ -92,35 +102,11 @@ fun AboutScreen(
     viewModel: AboutViewModel = viewModel(),
 ) {
     val updateState by viewModel.updateState.collectAsState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
-    Scaffold(
-        topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.common_about)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        },
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                start = 16.dp,
-                end = 16.dp,
-                bottom = 12.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
-        ) {
+    SettingsScaffold(
+        title = stringResource(R.string.common_about),
+        onNavigateBack = onNavigateBack,
+        modifier = modifier
+    ) {
             item { Hero() }
 
             item {
@@ -167,52 +153,48 @@ fun AboutScreen(
                 )
             }
 
-            item {
-                Spacer(Modifier.height(ScreenBottomPadding))
-            }
-        }
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun Hero(modifier: Modifier = Modifier) {
-    val shape = remember { MaterialShapes.Cookie12Sided }
-
+    val accent = MaterialTheme.colorScheme.primary
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp)
+            .padding(vertical = 8.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(112.dp)
+                .size(96.dp)
+                .clip(RoundedCornerShape(24.dp))
                 .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.tertiary,
-                        )
-                    ),
-                    shape = shape.toShape()
+                    Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.55f).compositeOver(Color.Black)))
                 )
         ) {
             Icon(
                 imageVector = MyIcons.Logo,
                 contentDescription = "Outify",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(52.dp)
+                tint = Color.White,
+                modifier = Modifier.size(48.dp)
             )
         }
 
-        Text(
-            text = "Outify",
-            style = MaterialTheme.typography.displaySmallEmphasized,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Outify",
+                style = MusiqueType.heroTitle,
+                color = MusiqueColors.textPrimary
+            )
+            Text(
+                text = BuildConfig.VERSION_NAME,
+                style = MusiqueType.cardSubtitle,
+                color = MusiqueColors.textTertiary
+            )
+        }
     }
 }
 
@@ -226,28 +208,17 @@ private fun UpdateButton(
     val available = state as? UpdateState.Available
     val checking = state is UpdateState.Checking
 
-    Button(
+    PillButton(
+        text = stringResource(
+            if (available != null) R.string.about_update_download
+            else R.string.about_check_updates
+        ),
+        icon = if (available != null) Icons.Rounded.Download else Icons.Rounded.Refresh,
         onClick = { if (available != null) onDownload(available.url) else onCheck() },
         enabled = !checking,
-        shapes = ButtonDefaults.shapes(),
-        contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp)
-            .height(ButtonDefaults.MediumContainerHeight)
-    ) {
-        Icon(
-            imageVector = if (available != null) Icons.Rounded.Download else Icons.Rounded.Refresh,
-            contentDescription = null
-        )
-        Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.MediumContainerHeight)))
-        Text(
-            stringResource(
-                if (available != null) R.string.about_update_download
-                else R.string.about_check_updates
-            )
-        )
-    }
+        loading = checking,
+        modifier = Modifier.padding(top = 12.dp)
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -259,46 +230,24 @@ private fun AboutSection(
     modifier: Modifier = Modifier,
     footer: (@Composable () -> Unit)? = null,
 ) {
-    val badgeShape = remember { MaterialShapes.Cookie9Sided }
-
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
+        SettingsSectionHeader(title)
+
+        if (items.isNotEmpty()) {
+            Column(
                 modifier = Modifier
-                    .size(44.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer, badgeShape.toShape())
+                    .fillMaxWidth()
+                    .clip(SettingsDefaults.groupShape)
+                    .background(MusiqueColors.card)
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLargeEmphasized,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            items.forEachIndexed { index, item ->
-                val onClick = (item as? AboutItem.Link)?.onClick
-
-                Surface(
-                    shape = segmentedShape(index, items.size),
-                    color = item.containerColor(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    // Surface clips to its shape, so the ripple stays inside the rounded corners
+                items.forEachIndexed { index, item ->
+                    if (index > 0) SettingsDivider(inset = SettingsDefaults.rowHorizontalPadding)
+                    val onClick = (item as? AboutItem.Link)?.onClick
                     Box(
-                        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(item.containerColor())
+                            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                     ) {
                         when (item) {
                             is AboutItem.Info -> InfoRow(item.label, item.value)
@@ -319,19 +268,11 @@ private fun AboutSection(
 @Composable
 private fun AboutItem.containerColor(): Color = when (this) {
     is AboutItem.Update -> when (state) {
-        is UpdateState.Available -> MaterialTheme.colorScheme.tertiaryContainer
-        is UpdateState.Error -> MaterialTheme.colorScheme.errorContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        is UpdateState.Available -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        is UpdateState.Error -> SettingsDefaults.tintRed.copy(alpha = 0.14f)
+        else -> Color.Transparent
     }
-    else -> MaterialTheme.colorScheme.surfaceContainerHigh
-}
-
-private fun segmentedShape(index: Int, count: Int): RoundedCornerShape {
-    val outer = 28.dp
-    val inner = 6.dp
-    val top = if (index == 0) outer else inner
-    val bottom = if (index == count - 1) outer else inner
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
+    else -> Color.Transparent
 }
 
 @Composable
@@ -341,19 +282,18 @@ private fun InfoRow(label: String, value: String) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MusiqueType.rowTitle,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MusiqueType.body,
+            color = MusiqueColors.textTertiary,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f)
         )
@@ -364,11 +304,11 @@ private fun InfoRow(label: String, value: String) {
 private fun BodyRow(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MusiqueType.rowTitle,
+        color = MusiqueColors.textTertiary,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     )
 }
 
@@ -380,26 +320,26 @@ private fun DeveloperRow(label: String, name: String) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(44.dp)
-                .background(MaterialTheme.colorScheme.primaryContainer, MaterialShapes.Cookie6Sided.toShape())
+                .size(SettingsDefaults.iconSize)
+                .background(SettingsDefaults.tintPink, CircleShape)
         ) {
             Text(
                 text = name.first().uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                style = MusiqueType.button,
+                color = Color.White
             )
         }
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MusiqueType.caption,
+                color = MusiqueColors.textTertiary
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -407,13 +347,13 @@ private fun DeveloperRow(label: String, name: String) {
             ) {
                 Text(
                     text = name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MusiqueType.rowTitle,
+                    color = MusiqueColors.textPrimary
                 )
                 Icon(
                     imageVector = Icons.Rounded.Favorite,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = SettingsDefaults.tintPink,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -428,30 +368,30 @@ private fun LinkRow(icon: ImageVector, label: String, sub: String) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MusiqueColors.textTertiary,
             modifier = Modifier.size(24.dp)
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MusiqueType.rowTitle,
+                color = MusiqueColors.textPrimary
             )
             Text(
                 text = sub,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MusiqueType.cardSubtitle,
+                color = MusiqueColors.textTertiary
             )
         }
         Icon(
             imageVector = Icons.AutoMirrored.Rounded.OpenInNew,
             contentDescription = stringResource(R.string.common_open),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MusiqueColors.textTertiary,
             modifier = Modifier.size(20.dp)
         )
     }
@@ -461,9 +401,9 @@ private fun LinkRow(icon: ImageVector, label: String, sub: String) {
 @Composable
 private fun UpdateRow(state: UpdateState) {
     val contentColor = when (state) {
-        is UpdateState.Available -> MaterialTheme.colorScheme.onTertiaryContainer
-        is UpdateState.Error -> MaterialTheme.colorScheme.onErrorContainer
-        else -> MaterialTheme.colorScheme.onSurface
+        is UpdateState.Available -> MaterialTheme.colorScheme.primary
+        is UpdateState.Error -> SettingsDefaults.tintRed
+        else -> MusiqueColors.textPrimary
     }
 
     val title: String
@@ -498,7 +438,7 @@ private fun UpdateRow(state: UpdateState) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
             if (state is UpdateState.Checking) {
@@ -516,13 +456,13 @@ private fun UpdateRow(state: UpdateState) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MusiqueType.rowTitle,
                 color = contentColor
             )
             if (supporting != null) {
                 Text(
                     text = supporting,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MusiqueType.cardSubtitle,
                     color = contentColor.copy(alpha = 0.8f)
                 )
             }

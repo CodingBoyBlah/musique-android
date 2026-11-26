@@ -2,29 +2,20 @@ package app.musique.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DeveloperMode
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Interests
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material.icons.rounded.DeveloperMode
+import androidx.compose.material.icons.rounded.Headphones
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Interests
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,24 +24,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.musique.R
 import app.musique.data.setting.LocalUiSettings
 import app.musique.ui.components.NavigationPreferenceEntry
-import app.musique.ui.components.PreferenceEntry
-import app.musique.ui.components.ScreenshotAvatar
+import app.musique.ui.components.SettingsChevron
+import app.musique.ui.components.SettingsDefaults
 import app.musique.ui.components.SettingsScaffold
 import app.musique.ui.components.SettingsSection
-import app.musique.ui.components.SmartImage
 import app.musique.ui.components.bottomsheet.account.AccountDetailBottomSheet
 import app.musique.ui.components.user.AccountAvatar
 import app.musique.ui.components.user.StatusPill
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
 import app.musique.ui.viewmodel.settings.SettingsViewModel
 
 @Composable
@@ -116,7 +107,8 @@ fun SettingsScreen(
                     NavigationPreferenceEntry(
                         title = { Text(stringResource(R.string.common_interface)) },
                         description = stringResource(R.string.settings_interface_desc),
-                        icon = { Icon(Icons.Default.Interests, contentDescription = null) },
+                        icon = { Icon(Icons.Rounded.Interests, contentDescription = null) },
+                        iconTint = SettingsDefaults.tintBlue,
                         onClick = openInterfaceSettings,
                     )
                 }
@@ -124,7 +116,8 @@ fun SettingsScreen(
                     NavigationPreferenceEntry(
                         title = { Text(stringResource(R.string.common_playback)) },
                         description = stringResource(R.string.settings_playback_desc),
-                        icon = { Icon(Icons.Default.Headphones, contentDescription = null) },
+                        icon = { Icon(Icons.Rounded.Headphones, contentDescription = null) },
+                        iconTint = SettingsDefaults.tintPink,
                         onClick = openPlaybackSettings,
                     )
                 }
@@ -137,7 +130,8 @@ fun SettingsScreen(
                     NavigationPreferenceEntry(
                         title = { Text(stringResource(R.string.common_misc)) },
                         description = stringResource(R.string.settings_misc_desc),
-                        icon = { Icon(Icons.Default.DeveloperMode, contentDescription = null) },
+                        icon = { Icon(Icons.Rounded.DeveloperMode, contentDescription = null) },
+                        iconTint = SettingsDefaults.tintGray,
                         onClick = openMiscSettings,
                     )
                 }
@@ -145,7 +139,8 @@ fun SettingsScreen(
                     NavigationPreferenceEntry(
                         title = { Text(stringResource(R.string.common_about)) },
                         description = stringResource(R.string.settings_about_desc),
-                        icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                        icon = { Icon(Icons.Rounded.Info, contentDescription = null) },
+                        iconTint = SettingsDefaults.tintIndigo,
                         onClick = openAboutSettings,
                     )
                 }
@@ -154,7 +149,6 @@ fun SettingsScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AccountEntry(
     isLoggedIn: Boolean,
@@ -163,33 +157,34 @@ private fun AccountEntry(
     profilePicture: String?,
     onClick: () -> Unit,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .background(if (pressed) Color.White.copy(alpha = 0.07f) else Color.Transparent)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         AccountAvatar(
             isLoggedIn = isLoggedIn,
             name = username,
             imageUrl = profilePicture,
             screenshotMode = screenshotMode,
-            size = 64.dp
+            size = 60.dp
         )
 
-        // Name + status
         Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
             modifier = Modifier.weight(1f)
         ) {
             Text(
                 text = if (isLoggedIn && !username.isNullOrBlank()) username
                 else stringResource(R.string.common_playback_login),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MusiqueType.sectionTitle,
+                color = MusiqueColors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -198,27 +193,12 @@ private fun AccountEntry(
             } else {
                 Text(
                     text = stringResource(R.string.settings_librespot_creds),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MusiqueType.cardSubtitle,
+                    color = MusiqueColors.textTertiary
                 )
             }
         }
 
-        // Trailing action
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(40.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    shape = CircleShape
-                )
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        SettingsChevron()
     }
 }

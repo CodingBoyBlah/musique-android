@@ -74,6 +74,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.musique.BuildConfig
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.compositeOver
+import app.musique.ui.components.SettingsDefaults
+import app.musique.ui.components.SettingsDivider
+import app.musique.ui.components.SettingsRoundIconButton
+import app.musique.ui.components.SettingsScaffold
+import app.musique.ui.components.SettingsSection
+import app.musique.ui.components.SettingsSectionHeader
+import app.musique.ui.components.SwitchPreferenceEntry
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
 import app.musique.R
 import app.musique.data.repository.SettingsRepository
 import app.musique.data.setting.LocalUiSettings
@@ -324,45 +336,19 @@ fun DebugScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.common_debug)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back)
-                        )
+    Box(modifier = modifier.fillMaxSize()) {
+        SettingsScaffold(
+            title = stringResource(R.string.common_debug),
+            onNavigateBack = onNavigateBack,
+            actions = {
+                SettingsRoundIconButton(
+                    icon = Icons.Rounded.ContentCopy,
+                    contentDescription = stringResource(R.string.debug_copy_all),
+                    onClick = {
+                        copy(sections.joinToString("\n\n") { it.toCopyText(includeSensitive) })
                     }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            copy(sections.joinToString("\n\n") { it.toCopyText(includeSensitive) })
-                        }
-                    ) {
-                        Icon(
-                            Icons.Rounded.ContentCopy,
-                            contentDescription = stringResource(R.string.debug_copy_all)
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                start = 16.dp,
-                end = 16.dp,
-                bottom = 12.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+                )
+            }
         ) {
             item {
                 SensitiveToggle(
@@ -378,10 +364,14 @@ fun DebugScreen(
                 )
             }
 
-            item {
-                Spacer(Modifier.height(ScreenBottomPadding))
-            }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = ScreenBottomPadding)
+        )
     }
 }
 
@@ -391,31 +381,14 @@ private fun SensitiveToggle(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        onClick = { onCheckedChange(!checked) },
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.debug_include_sensitive),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Text(
-                    text = stringResource(R.string.debug_include_sensitive_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-                )
-            }
-            // The whole surface is clickable, so the switch itself doesn't handle input
-            Switch(checked = checked, onCheckedChange = null)
+    SettingsSection(modifier = modifier) {
+        entry {
+            SwitchPreferenceEntry(
+                title = { Text(stringResource(R.string.debug_include_sensitive)) },
+                description = stringResource(R.string.debug_include_sensitive_desc),
+                isChecked = checked,
+                onCheckedChange = onCheckedChange,
+            )
         }
     }
 }
@@ -428,44 +401,24 @@ private fun DebugSection(
     modifier: Modifier = Modifier,
 ) {
     val isError = section.isError
-    val badgeContainer = if (isError) MaterialTheme.colorScheme.errorContainer
-    else MaterialTheme.colorScheme.primaryContainer
-    val badgeContent = if (isError) MaterialTheme.colorScheme.onErrorContainer
-    else MaterialTheme.colorScheme.onPrimaryContainer
-    val badgeShape = remember { MaterialShapes.Cookie9Sided }
-
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
+        SettingsSectionHeader(section.title)
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(SettingsDefaults.groupShape)
+                .background(
+                    if (isError) SettingsDefaults.tintRed.copy(alpha = 0.12f).compositeOver(MusiqueColors.card)
+                    else MusiqueColors.card
+                )
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(badgeContainer, badgeShape.toShape())
-            ) {
-                Icon(section.icon, contentDescription = null, tint = badgeContent, modifier = Modifier.size(24.dp))
-            }
-            Text(
-                text = section.title,
-                style = MaterialTheme.typography.titleLargeEmphasized,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             section.rows.forEachIndexed { index, row ->
-                val shape = segmentedShape(index, section.rows.size)
-                val container = if (isError) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
-                else MaterialTheme.colorScheme.surfaceContainerHigh
-
-                Surface(
-                    onClick = { onRowClick(row) },
-                    shape = shape,
-                    color = container,
-                    modifier = Modifier.fillMaxWidth()
+                if (index > 0) SettingsDivider(inset = SettingsDefaults.rowHorizontalPadding)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onRowClick(row) }
                 ) {
                     when (row) {
                         is DebugRow.Text -> InfoRow(row.label, row.value)
@@ -479,14 +432,6 @@ private fun DebugSection(
     }
 }
 
-private fun segmentedShape(index: Int, count: Int): RoundedCornerShape {
-    val outer = 28.dp
-    val inner = 6.dp
-    val top = if (index == 0) outer else inner
-    val bottom = if (index == count - 1) outer else inner
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
-}
-
 @Composable
 private fun StatusRow(text: String, available: Boolean, modifier: Modifier = Modifier) {
     Row(
@@ -494,20 +439,17 @@ private fun StatusRow(text: String, available: Boolean, modifier: Modifier = Mod
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 13.dp)
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (available) MaterialTheme.colorScheme.onSurface
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MusiqueType.rowTitle,
+            color = if (available) MusiqueColors.textPrimary else MusiqueColors.textTertiary,
             modifier = Modifier.weight(1f)
         )
 
-        val pillContainer = if (available) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.errorContainer
-        val pillContent = if (available) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onErrorContainer
+        val pillContent = if (available) SettingsDefaults.tintGreen else SettingsDefaults.tintRed
+        val pillContainer = pillContent.copy(alpha = 0.16f)
         val label = stringResource(if (available) R.string.state_available else R.string.state_unavailable)
 
         Row(
@@ -523,7 +465,7 @@ private fun StatusRow(text: String, available: Boolean, modifier: Modifier = Mod
                 tint = pillContent,
                 modifier = Modifier.size(18.dp)
             )
-            Text(text = label, style = MaterialTheme.typography.labelLarge, color = pillContent)
+            Text(text = label, style = MusiqueType.caption, color = pillContent)
         }
     }
 }
@@ -535,19 +477,19 @@ private fun InfoRow(text: String, value: String?, modifier: Modifier = Modifier)
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 13.dp)
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = MusiqueType.rowTitle,
+            color = MusiqueColors.textPrimary,
             modifier = Modifier.weight(1f)
         )
         Text(
             text = value ?: "null",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MusiqueType.rowDuration,
             fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MusiqueColors.textTertiary,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f)
         )

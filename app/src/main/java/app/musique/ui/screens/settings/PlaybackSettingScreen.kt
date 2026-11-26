@@ -56,6 +56,7 @@ import app.musique.ui.components.DropdownOption
 import app.musique.ui.components.DropdownPreferenceEntry
 import app.musique.ui.components.PreferenceEntry
 import app.musique.ui.components.SettingsScaffold
+import app.musique.ui.components.SettingsDefaults
 import app.musique.ui.components.SettingsSection
 import app.musique.ui.components.SwitchPreferenceEntry
 import app.musique.ui.components.TextInputPreferenceEntry
@@ -88,7 +89,7 @@ fun PlaybackSettingScreen(
         label = "advanced_arrow"
     )
     val restartHighlight by animateColorAsState(
-        targetValue = if (restartNeeded) MaterialTheme.colorScheme.tertiaryContainer
+        targetValue = if (restartNeeded) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
         else Color.Transparent,
         label = "restart_highlight"
     )
@@ -100,6 +101,7 @@ fun PlaybackSettingScreen(
     ) {
         item {
             SettingsSection(
+                iconTint = SettingsDefaults.tintPink,
                 title = stringResource(R.string.section_audio_settings),
                 icon = Icons.Default.Headphones
             ) {
@@ -212,6 +214,7 @@ fun PlaybackSettingScreen(
 
         item {
             SettingsSection(
+                iconTint = SettingsDefaults.tintOrange,
                 title = stringResource(R.string.section_controls_behavior),
                 icon = Icons.Default.Tune
             ) {
@@ -248,6 +251,7 @@ fun PlaybackSettingScreen(
 
         item {
             SettingsSection(
+                iconTint = SettingsDefaults.tintPurple,
                 title = stringResource(R.string.common_lyrics),
                 icon = Icons.Default.Lyrics
             ) {
@@ -274,6 +278,7 @@ fun PlaybackSettingScreen(
 
         item {
             SettingsSection(
+                iconTint = SettingsDefaults.tintGreen,
                 title = stringResource(R.string.section_spotify_connection),
                 icon = Icons.Default.Cast
             ) {

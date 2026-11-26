@@ -29,6 +29,7 @@ import app.musique.data.setting.GestureSetting
 import app.musique.data.setting.getDisplayName
 import app.musique.ui.components.PreferenceEntry
 import app.musique.ui.components.SettingsScaffold
+import app.musique.ui.components.SettingsDefaults
 import app.musique.ui.components.SettingsSection
 import app.musique.ui.components.SwitchPreferenceEntry
 import app.musique.ui.components.bottomsheet.settings.GestureCustomizeBottomSheet
@@ -54,7 +55,7 @@ fun SharedTransitionScope.GestureSettingsScreen(
         modifier = modifier
     ) {
         item {
-            SettingsSection {
+            SettingsSection(iconTint = SettingsDefaults.tintOrange) {
                 entry {
                     SwitchPreferenceEntry(
                         title = { Text(stringResource(R.string.settings_flip_queue)) },
@@ -78,7 +79,7 @@ fun SharedTransitionScope.GestureSettingsScreen(
 
         if (gestures.isNotEmpty()) {
             item {
-                SettingsSection {
+                SettingsSection(iconTint = SettingsDefaults.tintBlue) {
                     gestures.forEachIndexed { index, gesture ->
                         entry {
                             val actionLabel = stringResource(gesture.action.getDisplayName())
@@ -125,7 +126,7 @@ fun SharedTransitionScope.GestureSettingsScreen(
 
         if (swipeEnabled) {
             item {
-                SettingsSection {
+                SettingsSection(iconTint = SettingsDefaults.tintGreen) {
                     entry {
                         PreferenceEntry(
                             title = { Text(stringResource(R.string.gesture_add)) },
@@ -146,6 +147,7 @@ fun SharedTransitionScope.GestureSettingsScreen(
 
         item {
             SettingsSection(
+                iconTint = SettingsDefaults.tintTeal,
                 title = stringResource(R.string.gesture_try),
                 icon = Icons.Default.TouchApp
             ) {

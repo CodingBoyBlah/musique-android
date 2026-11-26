@@ -45,6 +45,12 @@ import app.musique.data.setting.LocalUiSettings
 import app.musique.ui.components.NavigationPreferenceEntry
 import app.musique.ui.components.PreferenceEntry
 import app.musique.ui.components.SettingsScaffold
+import app.musique.ui.components.SettingsActionRow
+import app.musique.ui.components.SettingsDefaults
+import app.musique.ui.components.SettingsDivider
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.rounded.Save
 import app.musique.ui.components.SettingsSection
 import app.musique.ui.components.SwitchPreferenceEntry
 import app.musique.ui.viewmodel.settings.BackupStatus
@@ -82,7 +88,7 @@ fun MiscSettingsScreen(
         modifier = modifier
     ) {
         item {
-            SettingsSection {
+            SettingsSection(iconTint = SettingsDefaults.tintGray) {
                 entry {
                     SwitchPreferenceEntry(
                         title = { Text(stringResource(R.string.settings_screenshot_mode)) },
@@ -97,8 +103,10 @@ fun MiscSettingsScreen(
 
         item {
             SettingsSection(
+                iconTint = SettingsDefaults.tintGreen,
                 title = stringResource(R.string.section_sync),
-                icon = Icons.Default.Sync
+                icon = Icons.Default.Sync,
+                footer = stringResource(R.string.sync_fetches_desc),
             ) {
                 entry {
                     PreferenceEntry(
@@ -123,21 +131,12 @@ fun MiscSettingsScreen(
                         onSync = viewModel::syncLikedTracks
                     )
                 }
-                entry {
-                    Text(
-                        text = stringResource(R.string.sync_fetches_desc),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 14.dp)
-                    )
-                }
             }
         }
 
         item {
             SettingsSection(
+                iconTint = SettingsDefaults.tintTeal,
                 title = stringResource(R.string.section_backup_restore),
                 icon = Icons.Default.Backup
             ) {
@@ -162,10 +161,15 @@ fun MiscSettingsScreen(
         }
 
         item {
-            SettingsSection {
+            SettingsSection(iconTint = SettingsDefaults.tintRed) {
                 entry {
                     PreferenceEntry(
-                        title = { Text(stringResource(R.string.common_reset_to_defaults)) },
+                        title = {
+                            Text(
+                                stringResource(R.string.common_reset_to_defaults),
+                                color = SettingsDefaults.tintRed
+                            )
+                        },
                         description = stringResource(R.string.settings_reset_prefs_desc),
                         icon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
                         onClick = { viewModel.resetPreferences() }
@@ -176,6 +180,7 @@ fun MiscSettingsScreen(
                         title = { Text(stringResource(R.string.common_debug)) },
                         description = stringResource(R.string.settings_show_debug_desc),
                         icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
+                        iconTint = SettingsDefaults.tintGray,
                         onClick = openDebugScreen
                     )
                 }
@@ -191,25 +196,24 @@ private fun SyncAction(
     isAuthenticated: Boolean,
     onSync: () -> Unit,
 ) {
+    if (status is SyncStatus.Idle) {
+        SettingsActionRow(
+            text = stringResource(R.string.sync_liked_tracks),
+            icon = Icons.Rounded.Refresh,
+            enabled = isAuthenticated,
+            onClick = onSync,
+        )
+        return
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         when (status) {
-            is SyncStatus.Idle -> {
-                Button(
-                    onClick = onSync,
-                    enabled = isAuthenticated,
-                    shapes = ButtonDefaults.shapes(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.sync_liked_tracks))
-                }
-            }
+            is SyncStatus.Idle -> Unit
 
             is SyncStatus.Syncing -> {
                 Text(
@@ -264,15 +268,11 @@ private fun SyncAction(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error
                 )
-                Button(
+                SettingsActionRow(
+                    text = stringResource(R.string.common_retry),
+                    icon = Icons.Rounded.Refresh,
                     onClick = onSync,
-                    shapes = ButtonDefaults.shapes(),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.common_retry))
-                }
+                )
             }
         }
     }
@@ -285,38 +285,31 @@ private fun BackupAction(
     onExport: () -> Unit,
     onImport: () -> Unit,
 ) {
+    if (status is BackupStatus.Idle) {
+        Column {
+            SettingsActionRow(
+                text = stringResource(R.string.settings_export),
+                icon = Icons.Rounded.Save,
+                onClick = onExport,
+            )
+            SettingsDivider(inset = SettingsDefaults.rowHorizontalPadding)
+            SettingsActionRow(
+                text = stringResource(R.string.settings_import),
+                icon = Icons.Rounded.Restore,
+                onClick = onImport,
+            )
+        }
+        return
+    }
+
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
         when (status) {
-            is BackupStatus.Idle -> {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Button(
-                        onClick = onExport,
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Save, contentDescription = null)
-                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text(stringResource(R.string.settings_export))
-                    }
-                    FilledTonalButton(
-                        onClick = onImport,
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Restore, contentDescription = null)
-                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                        Text(stringResource(R.string.settings_import))
-                    }
-                }
-            }
+            is BackupStatus.Idle -> Unit
 
             is BackupStatus.Exporting -> BusyRow(stringResource(R.string.settings_exporting))
             is BackupStatus.Importing -> BusyRow(stringResource(R.string.settings_importing))

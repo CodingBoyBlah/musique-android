@@ -31,6 +31,7 @@ import app.musique.data.repository.InterfaceSettings
 import app.musique.ui.components.ColorPreferenceEntry
 import app.musique.ui.components.PreferenceEntry
 import app.musique.ui.components.SettingsScaffold
+import app.musique.ui.components.SettingsDefaults
 import app.musique.ui.components.SettingsSection
 import app.musique.ui.components.SwitchPreferenceEntry
 import app.musique.ui.viewmodel.settings.AppearanceViewModel
@@ -49,7 +50,7 @@ fun AppearanceSettingScreen(
         modifier = modifier
     ) {
         item {
-            SettingsSection(title = "Dynamic", icon = Icons.Default.Palette) {
+            SettingsSection(iconTint = SettingsDefaults.tintPurple, title = "Dynamic", icon = Icons.Default.Palette) {
                 entry {
                     SwitchPreferenceEntry(
                         title = { Text(stringResource(R.string.settings_dynamic_theme)) },
@@ -87,7 +88,7 @@ fun AppearanceSettingScreen(
         }
 
         item {
-            SettingsSection {
+            SettingsSection(iconTint = SettingsDefaults.tintIndigo) {
                 entry {
                     SwitchPreferenceEntry(
                         title = { Text(stringResource(R.string.settings_pure_black)) },
@@ -109,7 +110,7 @@ fun AppearanceSettingScreen(
         }
 
         item {
-            SettingsSection(title = "Monochrome", icon = Icons.Default.MonochromePhotos) {
+            SettingsSection(iconTint = SettingsDefaults.tintGray, title = "Monochrome", icon = Icons.Default.MonochromePhotos) {
                 entry {
                     SwitchPreferenceEntry(
                         title = { Text(stringResource(R.string.settings_mono_artwork)) },
@@ -182,7 +183,7 @@ fun AppearanceSettingScreen(
         }
 
         item {
-            SettingsSection(title = "Font", icon = Icons.Default.TextFields) {
+            SettingsSection(iconTint = SettingsDefaults.tintBlue, title = "Font", icon = Icons.Default.TextFields) {
                 entry {
                     PreferenceEntry(
                         title = { Text(stringResource(R.string.settings_font_scale)) },

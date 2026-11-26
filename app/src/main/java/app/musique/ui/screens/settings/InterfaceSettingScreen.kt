@@ -17,6 +17,7 @@ import app.musique.R
 import app.musique.data.repository.InterfaceSettings
 import app.musique.ui.components.NavigationPreferenceEntry
 import app.musique.ui.components.SettingsScaffold
+import app.musique.ui.components.SettingsDefaults
 import app.musique.ui.components.SettingsSection
 import app.musique.ui.components.SwitchPreferenceEntry
 import app.musique.ui.viewmodel.settings.InterfaceViewModel
@@ -40,7 +41,7 @@ fun InterfaceSettingScreen(
         modifier = modifier
     ) {
         item {
-            SettingsSection {
+            SettingsSection(iconTint = SettingsDefaults.tintOrange) {
                 entry {
                     NavigationPreferenceEntry(
                         title = { Text(stringResource(R.string.common_gestures)) },
@@ -61,7 +62,7 @@ fun InterfaceSettingScreen(
         }
 
         item {
-            SettingsSection {
+            SettingsSection(iconTint = SettingsDefaults.tintBlue) {
                 entry {
                     SwitchPreferenceEntry(
                         title = { Text(stringResource(R.string.settings_nav_history)) },
@@ -87,7 +88,7 @@ fun InterfaceSettingScreen(
         }
 
         item {
-            SettingsSection {
+            SettingsSection(iconTint = SettingsDefaults.tintGray) {
                 entry {
                     SwitchPreferenceEntry(
                         title = { Text(stringResource(R.string.settings_system_padding)) },
