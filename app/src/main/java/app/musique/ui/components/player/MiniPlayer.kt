@@ -295,7 +295,7 @@ fun MiniPlayer(
                                     }
                                 }
                                 coroutineScope.launch {
-                                    dragOffsetX.animateTo(0f, animationSpec = MusiqueMotion.press())
+                                    dragOffsetX.animateTo(0f, animationSpec = MusiqueMotion.pop())
                                 }
                             }
                             MiniDragAxis.VerticalDown -> {
@@ -305,7 +305,7 @@ fun MiniPlayer(
                                     latestOnDismiss()
                                 } else {
                                     coroutineScope.launch {
-                                        dismissOffsetY.animateTo(0f, animationSpec = MusiqueMotion.press())
+                                        dismissOffsetY.animateTo(0f, animationSpec = MusiqueMotion.pop())
                                     }
                                 }
                             }

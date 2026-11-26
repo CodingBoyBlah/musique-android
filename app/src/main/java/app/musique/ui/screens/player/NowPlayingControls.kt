@@ -145,12 +145,17 @@ internal fun FavoriteButton(
             return@LaunchedEffect
         }
         pop.snapTo(if (isLiked) 1.25f else 0.85f)
-        pop.animateTo(1f, MusiqueMotion.press())
+        pop.animateTo(1f, MusiqueMotion.pop())
     }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val view = androidx.compose.ui.platform.LocalView.current
     PlayerIconButton(
         icon = if (isLiked) Icons.Rounded.Star else Icons.Rounded.StarBorder,
         contentDescription = stringResource(R.string.cd_favorite),
-        onClick = onToggle,
+        onClick = {
+            if (!isLiked) app.musique.ui.Haptics.confirm(context, view) else app.musique.ui.Haptics.toggle(context, view)
+            onToggle()
+        },
         tint = if (isLiked) palette.accent else MusiqueColors.textPrimary.copy(alpha = 0.85f),
         size = size,
         modifier = modifier.graphicsLayer {

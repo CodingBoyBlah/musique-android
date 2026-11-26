@@ -20,6 +20,9 @@ object MusiqueMotion {
     /** Button presses and toggles. Critically damped: a tap carries no momentum, so no bounce. */
     fun <T> press() = spring<T>(dampingRatio = 1f, stiffness = 900f)
 
+    /** After a flick or a celebratory toggle (favorite): momentum earns a little overshoot. */
+    fun <T> pop() = spring<T>(dampingRatio = 0.6f, stiffness = 450f)
+
     /** Now Playing artwork shrinking on pause and growing on play. */
     fun <T> artwork() = spring<T>(dampingRatio = 0.72f, stiffness = 280f)
 
