@@ -353,6 +353,16 @@ fun SharedTransitionScope.NavigationRoot(
                 )
             }
 
+            entry<Route.StatsScreen>(metadata = navRank(3)) {
+                val viewModel: app.musique.ui.screens.library.StatsViewModel = hiltViewModel()
+                app.musique.ui.screens.library.StatsScreen(
+                    viewModel = viewModel,
+                    onBack = { backStack.popKeepingRoot() },
+                    onOpenAlbum = { backStack.add(Route.AlbumScreen(it)) },
+                    onOpenArtist = { backStack.add(Route.ArtistScreen(it)) },
+                )
+            }
+
             entry<Route.AboutScreen> {
                 AboutScreen(
                     onNavigateBack = { backStack.popKeepingRoot() },

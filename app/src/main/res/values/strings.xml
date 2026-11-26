@@ -641,4 +641,5 @@
     </plurals>
     <string name="sheet_share_song_link">Share song.link</string>
     <string name="sheet_share_song_link_hint">Opens in any streaming service</string>
+    <string name="library_cat_stats">Stats</string>
 </resources>

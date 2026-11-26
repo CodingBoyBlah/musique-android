@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Album
+import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -201,6 +202,7 @@ fun SharedTransitionScope.LibraryScreen(
                         albums = libraryState.albums,
                         onOpenPage = { page = it },
                         onOpenLiked = { backStack.add(Route.LikedScreen()) },
+                        onOpenStats = { backStack.add(Route.StatsScreen) },
                         onOpenPlaylist = { backStack.add(Route.PlaylistScreen(it)) },
                         onOpenAlbum = { backStack.add(Route.AlbumScreen(it)) },
                         onCreatePlaylist = { GlobalPopupController.show(PopupSpec.CreatePlaylist()) },
@@ -285,6 +287,7 @@ private fun LibraryOverview(
     albums: List<Album>,
     onOpenPage: (LibraryPage) -> Unit,
     onOpenLiked: () -> Unit,
+    onOpenStats: () -> Unit,
     onOpenPlaylist: (String) -> Unit,
     onOpenAlbum: (String) -> Unit,
     onCreatePlaylist: () -> Unit,
@@ -312,6 +315,7 @@ private fun LibraryOverview(
                     Triple(Icons.Rounded.Album, R.string.library_cat_albums) { onOpenPage(LibraryPage.Albums) },
                     Triple(Icons.Rounded.MusicNote, R.string.library_cat_songs, onOpenLiked),
                     Triple(Icons.Rounded.Podcasts, R.string.library_cat_podcasts) { onOpenPage(LibraryPage.Podcasts) },
+                    Triple(Icons.Rounded.Insights, R.string.library_cat_stats, onOpenStats),
                 )
                 Column(Modifier.fillMaxWidth()) {
                     categories.forEachIndexed { index, (icon, label, onClick) ->

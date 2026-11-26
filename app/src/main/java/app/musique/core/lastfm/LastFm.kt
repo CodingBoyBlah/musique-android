@@ -2,21 +2,11 @@ package app.musique.core.lastfm
 
 import android.content.Context
 import android.util.Log
-import app.musique.core.model.PlayableAudio
-import app.musique.playback.PlaybackStateHolder
-import app.musique.playback.model.PlaybackOwner
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -165,66 +155,4 @@ class LastFmClient @Inject constructor(
         return MessageDigest.getInstance("MD5").digest(raw.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
     }
-}
-
-/**
- * Sends now playing and scrobbles for music played on this phone. Like the desktop app: tracks of
- * 30 s or more, scrobbled once half of it (or 4 minutes) has actually been heard. Playback on another
- * Connect device is left to that device so nothing is scrobbled twice.
- */
-@Singleton
-class LastFmScrobbler @Inject constructor(
-    private val client: LastFmClient,
-    private val stateHolder: PlaybackStateHolder,
-) {
-    // one thread, so the track bookkeeping below never races itself
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
-    private var started = false
-
-    private var current: PlayableAudio? = null
-    private var startedAtSec = 0L
-    private var heardMs = 0L
-    private var scrobbled = false
-
-    fun start() {
-        if (started) return
-        started = true
-        scope.launch {
-            stateHolder.state
-                .map { it.currentAudio?.takeIf { audio -> audio.isTrack() && it.owner == PlaybackOwner.LOCAL } }
-                .distinctUntilChanged { a, b -> a?.id == b?.id }
-                .collect { audio -> onTrack(audio) }
-        }
-        scope.launch {
-            var last = System.currentTimeMillis()
-            while (isActive) {
-                delay(1_000)
-                val now = System.currentTimeMillis()
-                val s = stateHolder.state.value
-                if (s.isPlaying && !s.isBuffering && s.owner == PlaybackOwner.LOCAL) heardMs += now - last
-                last = now
-                maybeScrobble()
-            }
-        }
-    }
-
-    private suspend fun onTrack(audio: PlayableAudio?) {
-        current = audio
-        heardMs = 0L
-        scrobbled = false
-        startedAtSec = System.currentTimeMillis() / 1000
-        if (audio == null || !client.status.value.connected) return
-        client.nowPlaying(audio.artistName(), audio.name, audio.albumName(), audio.duration / 1000)
-    }
-
-    private suspend fun maybeScrobble() {
-        val audio = current ?: return
-        if (scrobbled || audio.duration < 30_000 || !client.status.value.connected) return
-        if (heardMs < minOf(audio.duration / 2, 240_000L)) return
-        scrobbled = true
-        client.scrobble(audio.artistName(), audio.name, audio.albumName(), startedAtSec, audio.duration / 1000)
-    }
-
-    private fun PlayableAudio.artistName() = artists?.firstOrNull()?.name.orEmpty()
-    private fun PlayableAudio.albumName() = sourceTrack?.album?.name.orEmpty()
 }

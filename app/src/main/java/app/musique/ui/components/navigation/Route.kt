@@ -68,4 +68,7 @@ sealed interface Route : NavKey {
 
     @Serializable
     data object DebugScreen : Route, NavKey
+
+    @Serializable
+    data object StatsScreen : Route, NavKey
 }
