@@ -39,8 +39,11 @@ object MusiqueColors {
     val avatarPlaceholder = Color(0xFF4A4A4C)
     val avatarPlaceholderIcon = Color(0xFF8E8E93)
 
-    /** Apple Music / Cider rose, used when there is no artwork to take color from. */
-    val accent = Color(0xFFFA2F48)
+    /** The Musique accent, the same blue as the desktop app. */
+    val accent = Color(0xFF5873D8)
+    /** Lighter accent for text and icons on black (desktop `--color-accent-hover`). */
+    val accentLight = Color(0xFF819AF1)
+    val accentDim = Color(0x295873D8)
     val onDarkPlay = Color(0xFF1A0A00)
 }
 

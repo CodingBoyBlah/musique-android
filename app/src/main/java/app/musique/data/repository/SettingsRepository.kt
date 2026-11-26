@@ -2,6 +2,7 @@ package app.musique.data.repository
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import app.musique.ui.theme.MusiqueColors
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -134,7 +135,7 @@ class SettingsRepository @Inject constructor(
         val flipQueueGestures = prefs[Keys.Gesture.FLIP_QUEUE] ?: true
 
         val monochrome = prefs[Keys.Interface.MONOCHROME_IMAGES] ?: false
-        val accentColor = prefs[Keys.Interface.ACCENT_COLOR] ?: Color.Cyan.toArgb().toLong()
+        val accentColor = prefs[Keys.Interface.ACCENT_COLOR] ?: MusiqueColors.accent.toArgb().toLong()
 
         InterfaceSettings(
             swipeGesturesEnabled = enabled,
@@ -142,8 +143,9 @@ class SettingsRepository @Inject constructor(
             gestureSettings = if (enabled) decodeGestures(prefs[Keys.Gesture.GESTURES]) else emptyList(),
 
             // Dynamic theme
-            dynamicTheme = prefs[Keys.Interface.DYNAMIC_THEME] ?: true,
-            dynamicSystem = prefs[Keys.Interface.DYNAMIC_SYSTEM] ?: true,
+            // Like the desktop app: the Musique accent unless album or wallpaper colors are turned on
+            dynamicTheme = prefs[Keys.Interface.DYNAMIC_THEME] ?: false,
+            dynamicSystem = prefs[Keys.Interface.DYNAMIC_SYSTEM] ?: false,
             accentColor = Color(accentColor.toInt()),
             pureBlack = prefs[Keys.Interface.PURE_BLACK] ?: false,
             highContrastCompat = prefs[Keys.Interface.HIGH_CONTRAST_COMPAT] ?: false,
@@ -590,11 +592,11 @@ data class InterfaceSettings(
         )
     ),
     // Dynamic theme
-    val dynamicTheme: Boolean = true,
-    val dynamicSystem: Boolean = true,
+    val dynamicTheme: Boolean = false,
+    val dynamicSystem: Boolean = false,
     val pureBlack: Boolean = false,
     val highContrastCompat: Boolean = false,
-    val accentColor: Color = Color.Cyan,
+    val accentColor: Color = MusiqueColors.accent,
 
     // Font scaling (1.0 = uniform/no system scaling)
     val fontScale: Float = 1.0f,

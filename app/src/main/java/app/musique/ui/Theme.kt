@@ -86,11 +86,16 @@ fun MusiqueTheme(
     val colorScheme =
         when (themeMode) {
             ThemeMode.STATIC -> {
+                // Tonal spot washes the accent out; keep the exact color for filled controls, as the
+                // desktop app does, and let the scheme supply the rest of the roles around it.
                 SchemeTonalSpot(
                     Hct.fromInt(staticAccentColor.toArgb()),
                     darkTheme,
                     contrastLevel
-                ).toColorScheme()
+                ).toColorScheme().copy(
+                    primary = staticAccentColor,
+                    onPrimary = if (staticAccentColor.luminance() > 0.5f) Color.Black else Color.White,
+                )
             }
 
             ThemeMode.DYNAMIC_SYSTEM -> {
