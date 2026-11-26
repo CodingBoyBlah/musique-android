@@ -21,11 +21,8 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -60,6 +57,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +65,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -111,7 +110,7 @@ import app.musique.ui.components.navigation.currentOr
 import app.musique.ui.components.navigation.Route
 import app.musique.ui.components.player.MiniPlayer
 import app.musique.ui.components.player.PlayerSheet
-import app.musique.ui.components.player.PlayerSheetValue
+import app.musique.ui.components.player.behindPlayerSheet
 import app.musique.ui.components.player.QueueBottomSheet
 import app.musique.ui.components.player.rememberPlayerSheetState
 import app.musique.ui.components.player.rememberQueueBottomSheetState
@@ -393,6 +392,8 @@ class MainActivity : ComponentActivity() {
                                 Scaffold { innerPadding ->
                                     val context = LocalContext.current
                                     val view = LocalView.current
+                                    val isLandscapeLayout =
+                                        LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
                                     Box(
                                         modifier = Modifier
@@ -400,24 +401,35 @@ class MainActivity : ComponentActivity() {
                                             .padding(bottom = if(interfaceSettings.showSystemNavigationPadding) innerPadding.calculateBottomPadding() else 0.dp)
                                             .consumeWindowInsets(WindowInsets(bottom = innerPadding.calculateBottomPadding()))
                                     ) {
+                                        // The gesture inset the floating chrome still has to clear: zero when the
+                                        // box above already pads for it.
+                                        val navBarInset =
+                                            if (interfaceSettings.showSystemNavigationPadding) 0.dp
+                                            else innerPadding.calculateBottomPadding()
                                         val notificationPaddingBottom by animateDpAsState(
-                                            targetValue = if (currentAudio != null) 168.dp
-                                            else if (interfaceSettings.experimentalFloatingNav) 80.dp
-                                            else 68.dp,
+                                            targetValue = navBarInset + MusiqueDimens.notificationGap +
+                                                if (currentAudio != null && !isLandscapeLayout) MusiqueDimens.miniPlayerTotalHeight
+                                                else MusiqueDimens.tabBarTotalHeight,
                                             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                                             label = "notificationPaddingBottom"
                                         )
 
-                                        NavigationRoot(
-                                            backStack,
-                                            entryViewModelStoreProvider = entryViewModelStoreProvider,
-                                            modifier = Modifier.matchParentSize(),
-//                                            bottomPadding = if (currentAudio != null) 156.dp else if (interfaceSettings.experimentalFloatingNav) 60.dp else 56.dp
-                                        )
+                                        if (!isLandscapeLayout) {
+                                            NavigationRoot(
+                                                backStack,
+                                                entryViewModelStoreProvider = entryViewModelStoreProvider,
+                                                modifier = Modifier
+                                                    .matchParentSize()
+                                                    .behindPlayerSheet(
+                                                        playerSheetState,
+                                                        enabled = currentAudio != null
+                                                    ),
+                                            )
+                                        }
 
                                         PredictiveBackHandler(enabled = playerSheetState.isExpanded) { progress ->
                                             val collapsedOffset =
-                                                playerSheetState.draggableState.anchors.positionOf(PlayerSheetValue.Collapsed)
+                                                playerSheetState.collapsedOffset
                                             var previousOffset = 0f
 
                                             try {
@@ -428,13 +440,9 @@ class MainActivity : ComponentActivity() {
                                                     previousOffset = targetOffset
                                                 }
 
-                                                scope.launch {
-                                                    playerSheetState.draggableState.animateTo(PlayerSheetValue.Collapsed)
-                                                }
+                                                scope.launch { playerSheetState.collapse() }
                                             } catch (e: CancellationException) {
-                                                scope.launch {
-                                                    playerSheetState.draggableState.animateTo(PlayerSheetValue.Expanded)
-                                                }
+                                                scope.launch { playerSheetState.expand() }
                                             }
                                         }
 
@@ -464,8 +472,6 @@ class MainActivity : ComponentActivity() {
                                             addToWidgetViewModel = addToWidgetViewModel,
                                         )
 
-                                        val isLandscape =
-                                            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
                                         val onShowClick: (Episode?) -> Unit = onShowClick@{
                                             if (it == null) return@onShowClick
                                             val showUri = it.showUri
@@ -489,7 +495,7 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
 
-                                        if (isLandscape) {
+                                        if (isLandscapeLayout) {
                                             Row(modifier = Modifier.fillMaxSize()) {
                                                 Box(
                                                     modifier = Modifier
@@ -545,9 +551,33 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         } else {
-                                            // Portrait mode
-                                            val showBottomNav =
-                                                currentAudio == null || !playerSheetState.isExpanded
+                                            // Portrait mode. The tab bar sits under the sheet and slides away
+                                            // with the open progress; it leaves composition once fully covered.
+                                            val sheetFullyOpen by remember(playerSheetState) {
+                                                derivedStateOf { playerSheetState.progress >= 0.99f }
+                                            }
+                                            val showBottomNav = currentAudio == null || !sheetFullyOpen
+
+                                            if (showBottomNav) {
+                                                MusiqueTabBar(
+                                                    items = allRoutes,
+                                                    selectedId = selectedId,
+                                                    onItemSelected = { item ->
+                                                        if (backStack.last() != item.route) backStack.add(
+                                                            item.route
+                                                        )
+                                                    },
+                                                    showSelectedLabel = interfaceSettings.navbarShowLabel,
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomCenter)
+                                                        .graphicsLayer {
+                                                            val progress =
+                                                                if (currentAudio == null) 0f else playerSheetState.progress
+                                                            translationY = size.height * progress
+                                                            alpha = 1f - (progress * 2f).coerceIn(0f, 1f)
+                                                        },
+                                                )
+                                            }
 
                                             AnimatedVisibility(
                                                 visible = currentAudio != null,
@@ -563,9 +593,9 @@ class MainActivity : ComponentActivity() {
                                                 PlayerSheet(
                                                     sheetState = playerSheetState,
                                                     listState = playerListState,
-                                                    miniPlayerHeight = 88.dp,
-                                                    collapsedBottomInset = 68.dp,
-                                                    miniContent = { progress ->
+                                                    miniPlayerHeight = MusiqueDimens.miniPlayerHeight,
+                                                    collapsedBottomInset = MusiqueDimens.miniPlayerBottomInset + navBarInset,
+                                                    miniContent = {
                                                         MiniPlayer(
                                                             viewModel = miniPlayerViewModel,
                                                             onDismiss = {
@@ -583,7 +613,7 @@ class MainActivity : ComponentActivity() {
                                                     fullContent = { progress ->
                                                         PlayerContent(
                                                             viewModel = playerViewModel,
-                                                            expansionFractionProvider = { progress },
+                                                            expansionFractionProvider = progress,
                                                             listState = playerListState,
                                                             paddingValues = innerPadding,
                                                             onShowQueue = {
@@ -600,28 +630,6 @@ class MainActivity : ComponentActivity() {
                                                                 .fillMaxSize()
                                                         )
                                                     }
-                                                )
-                                            }
-
-                                            AnimatedVisibility(
-                                                visible = showBottomNav,
-                                                enter = slideInVertically(
-                                                    initialOffsetY = { fullHeight -> fullHeight }
-                                                ) + fadeIn(),
-                                                exit = slideOutVertically(
-                                                    targetOffsetY = { fullHeight -> fullHeight }
-                                                ) + fadeOut(),
-                                                modifier = Modifier.align(Alignment.BottomCenter),
-                                            ) {
-                                                MusiqueTabBar(
-                                                    items = allRoutes,
-                                                    selectedId = selectedId,
-                                                    onItemSelected = { item ->
-                                                        if (backStack.last() != item.route) backStack.add(
-                                                            item.route
-                                                        )
-                                                    },
-                                                    showSelectedLabel = interfaceSettings.navbarShowLabel,
                                                 )
                                             }
                                         }

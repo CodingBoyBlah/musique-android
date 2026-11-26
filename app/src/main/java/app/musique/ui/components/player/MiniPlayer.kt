@@ -18,7 +18,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -103,7 +102,6 @@ private const val HorizontalRubberBandFactor = 0.35f
 private const val VerticalDismissFollowFactor = 0.75f
 private val SkipSwipeThreshold = 72.dp
 private val DismissSwipeThreshold = 40.dp
-private val ExpandSwipeThreshold = 72.dp
 private val FlingVelocityThreshold = 450.dp
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
@@ -152,7 +150,6 @@ fun MiniPlayer(
             .pointerInput(sheetState, spirc) {
                 val skipThresholdPx = SkipSwipeThreshold.toPx()
                 val dismissThresholdPx = DismissSwipeThreshold.toPx()
-                val expandThresholdPx = ExpandSwipeThreshold.toPx()
                 val flingVelocityPx = FlingVelocityThreshold.toPx()
                 val fastHorizMinPx = 32.dp.toPx()
                 val fastDownMinPx = 20.dp.toPx()
@@ -314,19 +311,8 @@ fun MiniPlayer(
                             }
                             MiniDragAxis.VerticalUp -> {
                                 if (sheetState != null) {
-                                    val collapsed = sheetState.draggableState.anchors.positionOf(PlayerSheetValue.Collapsed)
-                                    val offset = sheetState.draggableState.offset.takeIf { !it.isNaN() } ?: collapsed
-                                    val draggedUp = (collapsed - offset).coerceAtLeast(0f)
-                                    val expand = releasedCleanly && when {
-                                        velocity.y < -flingVelocityPx -> true
-                                        velocity.y > flingVelocityPx -> false
-                                        else -> draggedUp > expandThresholdPx || sheetState.progress > 0.25f
-                                    }
                                     coroutineScope.launch {
-                                        sheetState.draggableState.animateTo(
-                                            targetValue = if (expand) PlayerSheetValue.Expanded else PlayerSheetValue.Collapsed,
-                                            animationSpec = MusiqueMotion.sheet(),
-                                        )
+                                        if (releasedCleanly) sheetState.settle(velocity.y) else sheetState.collapse()
                                     }
                                 } else if (releasedCleanly && (rawDragY < -dismissThresholdPx || velocity.y < -flingVelocityPx)) {
                                     latestOnClick?.invoke()
