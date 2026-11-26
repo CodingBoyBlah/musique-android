@@ -7,7 +7,9 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,12 +30,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -48,13 +52,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.musique.R
+import app.musique.ui.theme.LocalNowPlayingPalette
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.theme.MusiqueType
+import app.musique.ui.theme.pressScale
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -63,7 +73,7 @@ private val SPEED_PRESETS = listOf(0.5f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f, 4f)
 private const val MIN_SPEED = 0.25f
 private const val MAX_SPEED = 4f
 
-private fun Float.speedLabel(): String {
+internal fun Float.speedLabel(): String {
     val text = if (this == this.roundToInt().toFloat()) {
         this.roundToInt().toString()
     } else {
@@ -88,6 +98,7 @@ fun PlaybackSpeedControl(
     ) {
         SpeedCircle(
             speed = currentSpeed,
+            expanded = expanded,
             onClick = { expanded = !expanded },
         )
 
@@ -126,7 +137,6 @@ fun PlaybackSpeedControl(
                     )
                 }
                 CustomPill(
-                    // Highlighted when current speed isn't one of the presets.
                     selected = currentSpeed !in SPEED_PRESETS,
                     onClick = {
                         showCustomSheet = true
@@ -152,22 +162,31 @@ fun PlaybackSpeedControl(
 @Composable
 private fun SpeedCircle(
     speed: Float,
+    expanded: Boolean,
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val bg = if (expanded) MusiqueColors.pillSelected else MusiqueColors.fillOnArtwork
+    val fg = if (expanded) MusiqueColors.onPillSelected else MusiqueColors.textPrimary
+
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.size(44.dp),
+        color = bg,
+        border = BorderStroke(1.dp, MusiqueColors.glassEdge),
+        modifier = Modifier
+            .height(38.dp)
+            .pressScale(interactionSource, pressedScale = 0.92f),
     ) {
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(horizontal = 14.dp),
+        ) {
             Text(
                 text = speed.speedLabel(),
-                style = TextStyle(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                style = MusiqueType.caption.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
+                color = fg,
             )
         }
     }
@@ -179,22 +198,19 @@ private fun SpeedPill(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val interactionSource = remember { MutableInteractionSource() }
+    val background = if (selected) MusiqueColors.pillSelected else MusiqueColors.fillOnArtwork
+    val content = if (selected) MusiqueColors.onPillSelected else MusiqueColors.textPrimary
 
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(50),
         color = background,
-        modifier = Modifier.height(36.dp),
+        border = if (selected) null else BorderStroke(1.dp, MusiqueColors.glassEdge),
+        modifier = Modifier
+            .height(36.dp)
+            .pressScale(interactionSource, pressedScale = 0.92f),
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -202,7 +218,7 @@ private fun SpeedPill(
         ) {
             Text(
                 text = label,
-                style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                style = MusiqueType.navLabel,
                 color = content,
             )
         }
@@ -214,22 +230,19 @@ private fun CustomPill(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val background = if (selected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val content = if (selected) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val interactionSource = remember { MutableInteractionSource() }
+    val background = if (selected) MusiqueColors.pillSelected else MusiqueColors.fillOnArtwork
+    val content = if (selected) MusiqueColors.onPillSelected else MusiqueColors.textPrimary
 
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = RoundedCornerShape(50),
         color = background,
-        modifier = Modifier.height(36.dp),
+        border = if (selected) null else BorderStroke(1.dp, MusiqueColors.glassEdge),
+        modifier = Modifier
+            .height(36.dp)
+            .pressScale(interactionSource, pressedScale = 0.92f),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -244,7 +257,7 @@ private fun CustomPill(
             Spacer(Modifier.width(4.dp))
             Text(
                 text = stringResource(R.string.common_custom),
-                style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                style = MusiqueType.navLabel,
                 color = content,
             )
         }
@@ -258,6 +271,7 @@ fun CustomSpeedBottomSheet(
     onDismiss: () -> Unit,
     onConfirm: (Float) -> Unit,
 ) {
+    val palette = LocalNowPlayingPalette.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
@@ -287,6 +301,9 @@ fun CustomSpeedBottomSheet(
     ModalBottomSheet(
         onDismissRequest = ::dismiss,
         sheetState = sheetState,
+        containerColor = palette.backgroundBottom,
+        contentColor = MusiqueColors.textPrimary,
+        shape = MusiqueShapes.sheetTop,
     ) {
         Column(
             modifier = Modifier
@@ -296,8 +313,8 @@ fun CustomSpeedBottomSheet(
         ) {
             Text(
                 text = stringResource(R.string.player_playback_speed),
-                style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onSurface,
+                style = MusiqueType.sectionTitle,
+                color = MusiqueColors.textPrimary,
             )
 
             Spacer(Modifier.height(20.dp))
@@ -325,10 +342,10 @@ fun CustomSpeedBottomSheet(
                     keyboardType = KeyboardType.Decimal,
                 ),
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = MusiqueShapes.actionButton,
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
 
             Slider(
                 value = sliderValue,
@@ -338,6 +355,11 @@ fun CustomSpeedBottomSheet(
                 },
                 valueRange = MIN_SPEED..MAX_SPEED,
                 steps = ((MAX_SPEED - MIN_SPEED) / 0.05f).roundToInt() - 1,
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = Color.White,
+                    inactiveTrackColor = MusiqueColors.trackInactive,
+                ),
             )
 
             Row(
@@ -346,27 +368,36 @@ fun CustomSpeedBottomSheet(
             ) {
                 Text(
                     text = stringResource(R.string.player_speed_value, MIN_SPEED),
-                    style = TextStyle(fontSize = 12.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MusiqueType.timestamp,
+                    color = MusiqueColors.textSecondary,
                 )
                 Text(
                     text = stringResource(R.string.player_speed_value, MAX_SPEED.roundToInt()),
-                    style = TextStyle(fontSize = 12.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MusiqueType.timestamp,
+                    color = MusiqueColors.textSecondary,
                 )
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
 
             Button(
                 onClick = ::confirm,
                 enabled = !textIsInvalid,
                 shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MusiqueColors.pillSelected,
+                    contentColor = MusiqueColors.onPillSelected,
+                    disabledContainerColor = MusiqueColors.fillOnArtwork,
+                    disabledContentColor = MusiqueColors.textTertiary,
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
             ) {
-                Text(stringResource(R.string.player_speed_set, sliderValue.speedLabel()))
+                Text(
+                    text = stringResource(R.string.player_speed_set, sliderValue.speedLabel()),
+                    style = MusiqueType.button,
+                )
             }
 
             Spacer(Modifier.height(8.dp))
@@ -377,3 +408,13 @@ fun CustomSpeedBottomSheet(
 /** Snaps to the nearest 0.05 so the confirmed value doesn't carry float noise. */
 private fun Float.roundToNearestQuarter(): Float =
     (this / 0.05f).roundToInt() * 0.05f
+
+@Preview(showBackground = true, backgroundColor = 0xFF281810)
+@Composable
+private fun PlaybackSpeedControlPreview() {
+    MaterialTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            PlaybackSpeedControl(currentSpeed = 1.25f, onSpeedChange = {})
+        }
+    }
+}
