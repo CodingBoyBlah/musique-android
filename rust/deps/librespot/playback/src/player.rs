@@ -1330,7 +1330,7 @@ impl PlayerTrackLoader {
                     .ok()
             }
         };
-        let key = self.session.audio_key().request(track_id, file_id);
+        let key = self.session.audio_key().try_request(track_id, file_id);
         let (key, head) = future::join(key, head).await;
         debug!(
             "Prefetched <{}>{}",
