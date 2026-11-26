@@ -58,6 +58,13 @@ import app.musique.R
 import app.musique.core.model.PlayableAudio
 import app.musique.data.queue.SavedQueue
 import app.musique.ui.viewmodel.player.MultiQueueViewModel
+import app.musique.ui.theme.LocalNowPlayingPalette
+import app.musique.ui.theme.MusiqueType
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.theme.MusiqueColors
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
+import androidx.compose.ui.graphics.Color
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -77,7 +84,9 @@ fun QueueSwitcherBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = MusiqueShapes.sheetTop,
+        containerColor = LocalNowPlayingPalette.current.backgroundBottom,
+        contentColor = MusiqueColors.textPrimary,
     ) {
         Column(
             modifier = Modifier
@@ -94,8 +103,8 @@ fun QueueSwitcherBottomSheet(
                     Icons.Default.LibraryMusic,
                     contentDescription = null,
                     modifier = Modifier
-                        .clip(MaterialShapes.Cookie9Sided.toShape())
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clip(CircleShape)
+                        .background(MusiqueColors.fillOnArtwork)
                         .padding(12.dp)
                         .size(20.dp)
                 )
@@ -103,20 +112,19 @@ fun QueueSwitcherBottomSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.common_saved_queues),
-                        style = MaterialTheme.typography.headlineMediumEmphasized,
-                        fontWeight = FontWeight.Black,
+                        style = MusiqueType.sectionTitle,
                     )
                     if (queues.isNotEmpty()) {
                         Text(
                             text = pluralStringResource(R.plurals.queue_count, queues.size, queues.size),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MusiqueType.body,
+                            color = MusiqueColors.textSecondary,
                         )
                     }
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MusiqueColors.hairline)
 
             // Empty
             if (queues.isEmpty()) {
@@ -134,12 +142,12 @@ fun QueueSwitcherBottomSheet(
                             Icons.Default.LibraryMusic,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = MusiqueColors.textSecondary,
                         )
                         Text(
                             text = stringResource(R.string.queue_no_saved),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MusiqueType.body,
+                            color = MusiqueColors.textSecondary,
                         )
                     }
                 }
@@ -164,13 +172,20 @@ fun QueueSwitcherBottomSheet(
             }
 
             // Save queue
-            FilledTonalButton(
+            Button(
                 onClick = { showSaveDialog = true },
-                modifier = Modifier.fillMaxWidth()
+                shape = RoundedCornerShape(50),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MusiqueColors.pillSelected,
+                    contentColor = MusiqueColors.onPillSelected,
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
             ) {
                 Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.queue_save_current))
+                Text(stringResource(R.string.queue_save_current), style = MusiqueType.button)
             }
 
             Spacer(Modifier.height(6.dp))
@@ -215,9 +230,9 @@ private fun SavedQueueRow(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = if (isActive)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+            Color.White.copy(alpha = 0.14f)
         else
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            Color.White.copy(alpha = 0.06f),
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onActivate, onLongClick = onRename)
@@ -231,8 +246,8 @@ private fun SavedQueueRow(
                     .size(8.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isActive) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant
+                        if (isActive) LocalNowPlayingPalette.current.accent
+                        else MusiqueColors.trackInactive
                     )
             )
 
@@ -241,17 +256,17 @@ private fun SavedQueueRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = queue.name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MusiqueType.rowTitle,
                     fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                     color = if (isActive)
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                        MusiqueColors.textPrimary
                     else
-                        MaterialTheme.colorScheme.onSurface,
+                        MusiqueColors.textPrimary,
                 )
                 Text(
                     text = stringResource(R.string.queue_tracks_created, queue.trackUris.size, relativeTime(queue.createdAt)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MusiqueType.cardSubtitle,
+                    color = MusiqueColors.textSecondary,
                 )
             }
 
@@ -259,7 +274,7 @@ private fun SavedQueueRow(
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = stringResource(R.string.cd_delete_queue),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MusiqueColors.textSecondary,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -268,7 +283,7 @@ private fun SavedQueueRow(
                 Icon(
                     Icons.Default.Check,
                     contentDescription = stringResource(R.string.cd_active),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = LocalNowPlayingPalette.current.accent,
                     modifier = Modifier
                         .size(36.dp)
                         .padding(8.dp)
@@ -278,7 +293,7 @@ private fun SavedQueueRow(
                     Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = stringResource(R.string.cd_activate_queue),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MusiqueColors.textSecondary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
