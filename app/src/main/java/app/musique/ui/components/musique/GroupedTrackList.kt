@@ -13,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -66,46 +65,53 @@ fun GroupedListDivider(
 }
 
 /**
- * Returns the corner shape for row [index] out of [count] inside a virtualized grouped card.
+ * Corner shape for row [index] of [count] in a Cider tile group: large corners on the outside of
+ * the group, small ones where two tiles meet.
  */
 fun groupedItemShape(
     index: Int,
     count: Int,
-    cornerRadius: Dp = 20.dp,
+    cornerRadius: Dp = 18.dp,
+    innerRadius: Dp = 6.dp,
 ): Shape = when {
     count <= 1 -> RoundedCornerShape(cornerRadius)
-    index == 0 -> RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)
-    index == count - 1 -> RoundedCornerShape(bottomStart = cornerRadius, bottomEnd = cornerRadius)
-    else -> RectangleShape
+    index == 0 -> RoundedCornerShape(
+        topStart = cornerRadius, topEnd = cornerRadius, bottomStart = innerRadius, bottomEnd = innerRadius,
+    )
+    index == count - 1 -> RoundedCornerShape(
+        topStart = innerRadius, topEnd = innerRadius, bottomStart = cornerRadius, bottomEnd = cornerRadius,
+    )
+    else -> RoundedCornerShape(innerRadius)
 }
 
+/** Gap between two tiles of a group, as in Cider's song lists. */
+val GroupedTileGap = 3.dp
+
 /**
- * Virtualized LazyColumn wrapper that visually merges adjacent rows into one 20dp rounded
- * container with inset 0.5dp dividers while preserving LazyColumn item recycling.
+ * One row of a Cider style song list in a LazyColumn: each row is its own tile, separated by a
+ * small gap, with the group's outer corners rounded. Keeps LazyColumn item recycling intact.
  */
 @Composable
 fun GroupedTrackItemContainer(
     index: Int,
     count: Int,
     modifier: Modifier = Modifier,
-    containerColor: Color = MusiqueColors.card,
-    dividerStartInset: Dp = 48.dp,
+    containerColor: Color = MusiqueColors.chrome,
+    @Suppress("UNUSED_PARAMETER") dividerStartInset: Dp = 48.dp,
     horizontalMargin: Dp = MusiqueDimens.screenPadding,
-    cornerRadius: Dp = 20.dp,
+    cornerRadius: Dp = 18.dp,
     content: @Composable () -> Unit,
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = horizontalMargin),
+            .padding(horizontal = horizontalMargin)
+            .padding(bottom = if (index < count - 1) GroupedTileGap else 0.dp),
         shape = groupedItemShape(index = index, count = count, cornerRadius = cornerRadius),
         color = containerColor,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             content()
-            if (index < count - 1) {
-                GroupedListDivider(startInset = dividerStartInset)
-            }
         }
     }
 }
