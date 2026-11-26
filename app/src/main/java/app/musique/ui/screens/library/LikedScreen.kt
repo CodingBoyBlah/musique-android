@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +32,8 @@ import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,12 +76,18 @@ import app.musique.core.model.Artist
 import app.musique.core.model.OutifyUri
 import app.musique.core.model.toPlayableAudio
 import app.musique.core.model.toSpotifyUri
-import app.musique.ui.components.ArtworkBackground
-import app.musique.ui.components.CollapsingHeader
 import app.musique.ui.components.bottomsheet.library.FilterSortBottomSheet
-import app.musique.ui.components.rememberCollapsingHeaderState
 import app.musique.ui.components.rows.SwipeableTrackRowConfigured
-import app.musique.ui.screens.MaterialSearchBar
+import app.musique.ui.components.musique.CapsuleSearchField
+import app.musique.ui.components.musique.FloatingRoundButton
+import app.musique.ui.components.musique.LargeTitleTopBar
+import app.musique.ui.components.musique.PlayShuffleRow
+import app.musique.ui.components.musique.TopBarIconButton
+import app.musique.ui.components.musique.rememberCollapseFraction
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.theme.MusiqueType
 import app.musique.ui.viewmodel.library.LikedViewModel
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
@@ -146,207 +157,161 @@ fun SharedTransitionScope.LikedScreen(
     var transitioningTrackUri by remember { mutableStateOf<String?>(null) }
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
-    val collapsingState = rememberCollapsingHeaderState()
-    val atTop by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex == 0 &&
-                    listState.firstVisibleItemScrollOffset == 0
-        }
-    }
-    SideEffect { collapsingState.canExpand = atTop }
+    val collapseFraction = rememberCollapseFraction(listState)
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val scope = rememberCoroutineScope()
 
-    val isScrolled by remember {
+    val showScrollToTop by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 2 ||
                     listState.firstVisibleItemScrollOffset > 100
         }
     }
-    val showScrollToTop = isScrolled
 
-    // Scroll to track if provided
+    // Header items above the first track: count + play row, search row, optional sync banner.
+    val headerItemCount = if (isRefreshing) 3 else 2
     LaunchedEffect(scrollToIndex, tracks) {
         if (scrollToIndex >= 0 && scrollToIndex < tracks.size) {
-            // Add 1 to account for the search bar item
-            listState.scrollToItem(scrollToIndex + 1)
+            listState.scrollToItem(scrollToIndex + headerItemCount)
         }
     }
 
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (!listState.isScrollInProgress) {
-            val canExpand =
-                listState.firstVisibleItemIndex == 0 &&
-                        listState.firstVisibleItemScrollOffset == 0
-
-            collapsingState.snapIfNeeded(canExpand)
-        }
-    }
-
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = {
-            scope.launch {
-                listState.scrollToItem(0)
-                viewModel.refresh()
-            }
-        },
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(color = MaterialTheme.colorScheme.surface)
-            .nestedScroll(collapsingState.nestedScrollConnection)
+            .background(MusiqueColors.canvas)
     ) {
-        val currentTopBarHeightDp =
-            with(density) { collapsingState.height.value.toDp() }
-
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(
-                top = currentTopBarHeightDp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                scope.launch {
+                    listState.scrollToItem(0)
+                    viewModel.refresh()
+                }
+            },
             modifier = Modifier.fillMaxSize()
         ) {
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    MaterialSearchBar(
-                        query = searchQuery,
-                        onQueryChange = { new ->
-                            viewModel.onQueryChange(new)
-                        },
-                        isLoading = false,
-                        autoFocus = false,
-                        placeholderText = stringResource(R.string.search_liked_placeholder),
-                        modifier = Modifier
-                            .weight(1f)
-                    )
-
-                    IconButton(
-                        onClick = { showFilterSheet = true },
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(Icons.Default.FilterAlt, contentDescription = stringResource(R.string.common_filter_and_sort))
-                    }
-                }
-            }
-
-            if (isRefreshing) {
-                item {
-                    SyncProgressBanner(
-                        fetchedCount = fetchedCount,
-                        totalCount = totalCount,
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(
+                    top = statusBar + MusiqueDimens.topBarHeight + 4.dp,
+                    bottom = ScreenBottomPadding + 16.dp,
+                ),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                item(key = "liked_header") {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .padding(horizontal = MusiqueDimens.screenPadding)
+                            .padding(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.account_song_count, totalCount),
+                            style = MusiqueType.rowSubtitle,
+                            color = MusiqueColors.textSecondary,
+                        )
+                        PlayShuffleRow(
+                            onPlayClick = {
+                                tracks.firstOrNull()?.let { first ->
+                                    spirc.load(OutifyUri.Liked, first.toSpotifyUri())
+                                    viewModel.setAudio(first.toPlayableAudio())
+                                }
+                            },
+                            onShuffleClick = { spirc.shuffleLoad() },
+                            primaryColor = MaterialTheme.colorScheme.primary,
+                            onPrimaryColor = MaterialTheme.colorScheme.onPrimary,
+                            enabled = tracks.isNotEmpty(),
+                        )
+                    }
+                }
+
+                item(key = "liked_search") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = MusiqueDimens.screenPadding, end = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        CapsuleSearchField(
+                            query = searchQuery,
+                            onQueryChange = { new -> viewModel.onQueryChange(new) },
+                            placeholder = stringResource(R.string.search_liked_placeholder),
+                            modifier = Modifier.weight(1f)
+                        )
+                        TopBarIconButton(
+                            icon = Icons.Rounded.FilterList,
+                            contentDescription = stringResource(R.string.common_filter_and_sort),
+                            onClick = { showFilterSheet = true },
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+
+                if (isRefreshing) {
+                    item(key = "liked_sync") {
+                        SyncProgressBanner(
+                            fetchedCount = fetchedCount,
+                            totalCount = totalCount,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = MusiqueDimens.screenPadding, vertical = 4.dp)
+                        )
+                    }
+                }
+
+                items(
+                    items = tracks,
+                    key = { it.uri },
+                    contentType = { "track" }
+                ) { track ->
+                    SwipeableTrackRowConfigured(
+                        track = track,
+                        currentAudio = currentAudio,
+                        isPlaybackPlaying = isPlaybackPlaying,
+                        onRowClick = remember(track.uri) {
+                            {
+                                transitioningTrackUri = track.uri
+                                spirc.load(OutifyUri.Liked, track.toSpotifyUri())
+                                // Optimistic UI
+                                viewModel.setAudio(track.toPlayableAudio())
+                            }
+                        },
+                        onArtworkClick = {
+                            transitioningTrackUri = track.uri
+                            track.album?.let(onArtworkClick)
+                        },
+                        onArtistClick = { artist ->
+                            transitioningTrackUri = track.uri
+                            onArtistClick(artist)
+                        },
+                        modifier = Modifier.animateItem(),
                     )
                 }
-            }
-
-            items(
-                items = tracks,
-                key = { it.uri },
-                contentType = { "track" }
-            ) { track ->
-                SwipeableTrackRowConfigured(
-                    track = track,
-                    currentAudio = currentAudio,
-                    isPlaybackPlaying = isPlaybackPlaying,
-                    onRowClick = remember(track.uri) {
-                        {
-                            transitioningTrackUri = track.uri
-                            spirc.load(OutifyUri.Liked, track.toSpotifyUri())
-                            // Optimistic UI
-                            viewModel.setAudio(track.toPlayableAudio())
-                        }
-                    },
-                    onArtworkClick = {
-                        transitioningTrackUri = track.uri
-                        onArtworkClick(track.album!!)
-                    },
-                    onArtistClick = { artist ->
-                        transitioningTrackUri = track.uri
-                        onArtistClick(artist)
-                    },
-                    modifier = Modifier.animateItem(),
-                )
-            }
-
-            item {
-                Spacer(Modifier.height(ScreenBottomPadding))
             }
         }
 
-        CollapsingHeader(
-            collapseFraction = collapsingState.collapseFraction,
-            headerHeight = currentTopBarHeightDp,
-            onBackPressed = onBack,
-            backgroundContent = {
-                val artworkUrl by viewModel.getArtwork().collectAsState(initial = null)
-                ArtworkBackground(
-                    artworkUrl = artworkUrl?.let { ALBUM_COVER_URL + it },
-                    fallback = {
-                        Icon(
-                            Icons.Default.MusicNote,
-                            contentDescription = null
-                        )
-                    }
-                )
-            },
-            titleContent = {
-                Text(
-                    text = stringResource(R.string.library_liked_tracks),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = stringResource(R.string.account_song_count, totalCount),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            fabContent = {
-                LargeExtendedFloatingActionButton(
-                    onClick = {
-                        spirc.shuffleLoad()
-                    },
-                    shape = MaterialShapes.Cookie9Sided.toShape()
-                ) {
-                    Icon(Icons.Rounded.Shuffle, null)
-                }
-            }
+        LargeTitleTopBar(
+            title = stringResource(R.string.common_liked_songs),
+            collapseFraction = collapseFraction,
+            onBack = onBack,
         )
 
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomEnd
+        AnimatedVisibility(
+            visible = showScrollToTop,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = fabBottomPadding(currentAudio != null)),
         ) {
-            AnimatedVisibility(
-                visible = showScrollToTop,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-                exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
+            FloatingRoundButton(
+                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                contentDescription = stringResource(R.string.common_scroll_to_top),
             ) {
-                FloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            listState.animateScrollToItem(0)
-                        }
-                    },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier
-                        .padding(end = 16.dp, bottom = fabBottomPadding(currentAudio != null))
-                        .size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowUp,
-                        contentDescription = stringResource(R.string.common_scroll_to_top)
-                    )
-                }
+                Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null, modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -376,8 +341,9 @@ private fun SyncProgressBanner(
 ) {
     Card(
         modifier = modifier,
+        shape = MusiqueShapes.card,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
+            containerColor = MusiqueColors.card
         )
     ) {
         Row(
@@ -390,13 +356,13 @@ private fun SyncProgressBanner(
             Icon(
                 imageVector = Icons.Rounded.CloudSync,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                tint = MaterialTheme.colorScheme.primary
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.library_syncing_tracks),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = MusiqueColors.textPrimary
                 )
                 Text(
                     text = if (totalCount > 50) {
@@ -405,7 +371,7 @@ private fun SyncProgressBanner(
                         "Syncing $fetchedCount of $totalCount"
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                    color = MusiqueColors.textSecondary
                 )
                 if (totalCount > 0) {
                     Spacer(Modifier.height(8.dp))
