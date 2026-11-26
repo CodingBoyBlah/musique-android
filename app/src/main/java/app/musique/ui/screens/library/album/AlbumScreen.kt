@@ -152,7 +152,8 @@ fun SharedTransitionScope.AlbumDetailScreen(
                 if (highlightTrackUri != null && tracks.isNotEmpty()) {
                     val index = tracks.indexOfFirst { it.uri == highlightTrackUri }
                     if (index >= 0) {
-                        lazyList.scrollToItem(index + 2)
+                        // Hero, action row and spacer come before the first track.
+                        lazyList.scrollToItem(index + 3)
                     }
                 }
             }
