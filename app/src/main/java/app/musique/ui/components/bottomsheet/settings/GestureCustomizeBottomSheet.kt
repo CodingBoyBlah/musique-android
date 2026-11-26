@@ -90,7 +90,7 @@ fun GestureCustomizeBottomSheet(
             ) {
                 Text(
                     text = stringResource(R.string.gesture_customize),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = app.musique.ui.theme.MusiqueType.sectionTitle,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -99,7 +99,7 @@ fun GestureCustomizeBottomSheet(
                     color = if (enabledState) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Switch(
+                app.musique.ui.components.SettingsSwitch(
                     checked = enabledState,
                     onCheckedChange = { enabledState = it },
                 )

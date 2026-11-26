@@ -201,15 +201,15 @@ private fun JamHeader(
         if (members.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(MaterialShapes.Cookie9Sided.toShape())
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                    .size(88.dp)
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Default.Group,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(40.dp),
                 )
             }
@@ -221,8 +221,7 @@ private fun JamHeader(
 
         Text(
             text = stringResource(R.string.jam_title),
-            style = MaterialTheme.typography.headlineSmallEmphasized,
-            fontWeight = FontWeight.SemiBold,
+            style = app.musique.ui.theme.MusiqueType.heroTitle,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(4.dp))
@@ -362,8 +361,8 @@ private fun JamStartCard(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(14.dp),
+            color = app.musique.ui.components.bottomsheet.MusiqueSheetDefaults.groupColor,
         ) {
             Column(
                 modifier = Modifier

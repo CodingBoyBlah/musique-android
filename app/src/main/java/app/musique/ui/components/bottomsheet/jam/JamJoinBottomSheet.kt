@@ -145,8 +145,7 @@ fun JoinJamBottomSheet(
 
             Text(
                 text = "Join ${host.name}'s Jam",
-                style = MaterialTheme.typography.headlineSmallEmphasized,
-                fontWeight = FontWeight.SemiBold,
+                style = app.musique.ui.theme.MusiqueType.heroTitle,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
