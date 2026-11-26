@@ -75,6 +75,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
+import app.musique.core.update.AppUpdater
+import app.musique.core.update.UpdatePrompt
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreProvider
@@ -143,6 +145,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var volumeController: VolumeController
 
+    @Inject
+    lateinit var appUpdater: AppUpdater
+
     private val deepLinkFlow = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
 
     @Volatile
@@ -181,6 +186,7 @@ class MainActivity : ComponentActivity() {
         }
 
         volumeController.start()
+        appUpdater.checkOnLaunch()
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // Dark only: light status and navigation bar icons whatever the system theme is.
@@ -383,6 +389,7 @@ class MainActivity : ComponentActivity() {
                 if (!onboardingComplete) {
                     OnboardingScreen(viewModel = onboardingViewModel)
                 } else {
+                    UpdatePrompt(appUpdater)
                     CompositionLocalProvider(
                         LocalDensity provides fixedDensity
                     ) {
