@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,7 +42,10 @@ import app.musique.data.setting.LocalSwipeActionHandler
 import app.musique.data.setting.LocalSwipeGestureSettings
 import app.musique.data.setting.buildLongPressAction
 import app.musique.data.setting.buildSwipeGesturesForTrack
+import app.musique.ui.GlobalPopupController
 import app.musique.ui.Haptics
+import app.musique.ui.PopupSpec
+import app.musique.ui.components.musique.RowMoreButton
 import app.musique.ui.components.SkeletonBox
 
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -86,7 +89,7 @@ fun SharedTransitionScope.SwipeableTrackRowConfigured(
         ) {
             SkeletonBox(
                 modifier = Modifier.size(48.dp),
-                shape = RoundedCornerShape(6.dp)
+                shape = RoundedCornerShape(8.dp)
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -168,26 +171,27 @@ fun SharedTransitionScope.SwipeableTrackRowConfigured(
                 onTitleClick = onTitleClick,
 
                 trailingContent = {
-                    // Liked indicator
                     if (isLiked) {
                         Icon(
-                            Icons.Default.Favorite,
-                            contentDescription = stringResource(R.string.common_liked)
+                            Icons.Rounded.Favorite,
+                            contentDescription = stringResource(R.string.common_liked),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp),
                         )
                     }
 
                     trailingContent?.invoke()
 
-                    Text(
-                        text = formatDuration(track.duration.toInt()),
-                        style = MaterialTheme.typography.bodySmall
+                    RowMoreButton(
+                        onClick = {
+                            GlobalPopupController.show(PopupSpec.TrackInfo(track = track, isLiked = isLiked))
+                        },
                     )
                 },
 
                 sharedTransitionScope = this@SwipeableTrackRowConfigured,
                 sharedTransitionKey = if (isTransitioning)
                     track.album?.sharedTransitionKey() else null,
-                modifier = modifier
             )
         }
     }

@@ -3,36 +3,18 @@ package app.musique.ui.components.rows
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explicit
-import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.rounded.Explicit
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import app.musique.ALBUM_COVER_URL
 import app.musique.R
@@ -41,7 +23,7 @@ import app.musique.core.model.Show
 import app.musique.core.model.ShowMediaType
 import app.musique.core.model.getCover
 import app.musique.data.setting.LocalUiSettings
-import app.musique.ui.components.SmartImage
+import app.musique.ui.theme.MusiqueColors
 import app.musique.utils.SharedElementKey
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -62,24 +44,8 @@ fun ShowRow(
 
     sharedTransitionScope: SharedTransitionScope? = null,
     sharedTransitionKey: String? = "${SharedElementKey.ALBUM_ARTWORK}_${show.getCover(CoverSize.MEDIUM)}",
-    color: Color = MaterialTheme.colorScheme.surfaceVariant,
+    color: Color = MusiqueColors.cardRaised,
 ) {
-    val imageDp: Dp = when (density) {
-        TrackRowDensity.Compact -> 40.dp
-        TrackRowDensity.Default -> 56.dp
-        TrackRowDensity.Spacious -> 72.dp
-    }
-    val combinedModifier = if (onRowClick != null || onRowLongClick != null) {
-        modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = { onRowClick?.invoke() },
-                onLongClick = { onRowLongClick?.invoke() }
-            )
-    } else {
-        modifier.fillMaxWidth()
-    }
-
     val artworkModifier =
         if (sharedTransitionScope != null && sharedTransitionKey != null) {
             with(sharedTransitionScope) {
@@ -90,115 +56,54 @@ fun ShowRow(
             }
         } else Modifier
 
-    Surface(
-        modifier = combinedModifier.semantics {
-            contentDescription?.let { this.contentDescription = it }
+    val episodeCount = show.episodes.size
+    val subtitle = listOf(
+        show.publisher,
+        pluralStringResource(R.plurals.show_episode_count_plural, episodeCount, episodeCount),
+    ).filter { it.isNotBlank() }.joinToString(" · ")
+
+    EntityRowLayout(
+        title = show.name,
+        artworkUrl = show.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+        modifier = modifier,
+        subtitle = {
+            EntityRowSubtitle(
+                text = subtitle,
+                modifier = Modifier
+                    .then(
+                        if (onPublisherClick != null) {
+                            Modifier.combinedClickable(onClick = onPublisherClick, onLongClick = onRowLongClick)
+                        } else Modifier
+                    )
+                    .testTag("showrow.publisher"),
+            )
         },
-    ) {
-        Row(
-            modifier = modifier
-                .padding(
-                    horizontal = 12.dp, vertical = when (density) {
-                        TrackRowDensity.Compact -> 6.dp
-                        TrackRowDensity.Default -> 8.dp
-                        TrackRowDensity.Spacious -> 12.dp
-                    }
-                )
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                color = color,
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
-                    .size(imageDp)
-            ) {
-                SmartImage(
-                    url = show.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
-                    contentDescription = stringResource(R.string.settings_show_artwork),
-                    modifier = artworkModifier,
-                    monochrome = LocalUiSettings.current.monochromeTracks
+        density = density,
+        artworkModifier = artworkModifier,
+        artworkColor = color,
+        monochrome = LocalUiSettings.current.monochromeTracks,
+        onRowClick = onRowClick,
+        onRowLongClick = onRowLongClick,
+        contentDescription = contentDescription,
+        titleTestTag = "showrow.title",
+        trailing = {
+            if (show.mediaType == ShowMediaType.VIDEO || show.mediaType == ShowMediaType.MIXED) {
+                Icon(
+                    Icons.Rounded.Videocam,
+                    contentDescription = stringResource(R.string.library_video_episodes),
+                    tint = MusiqueColors.textTertiary,
+                    modifier = Modifier.size(18.dp),
                 )
             }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = show.name,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = when (density) {
-                            TrackRowDensity.Compact -> 14.sp
-                            TrackRowDensity.Default -> 16.sp
-                            TrackRowDensity.Spacious -> 18.sp
-                        }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("showrow.title")
+            if (show.isExplicit) {
+                Icon(
+                    Icons.Rounded.Explicit,
+                    contentDescription = null,
+                    tint = MusiqueColors.textTertiary,
+                    modifier = Modifier.size(15.dp),
                 )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = show.publisher,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier
-                            .then(
-                                if (onPublisherClick != null) {
-                                    Modifier.combinedClickable(
-                                        onClick = { onPublisherClick() },
-                                        onLongClick = {}
-                                    )
-                                } else Modifier
-                            )
-                            .testTag("showrow.publisher")
-                    )
-
-                    val episodeCount = show.episodes.size
-                    Text(
-                        text = pluralStringResource(R.plurals.show_episode_count_plural, episodeCount, episodeCount),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
-
-            Row(
-                modifier = Modifier
-                    .padding(end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (show.mediaType == ShowMediaType.VIDEO || show.mediaType == ShowMediaType.MIXED) {
-                    Icon(
-                        Icons.Default.Videocam,
-                        contentDescription = stringResource(R.string.library_video_episodes)
-                    )
-                }
-
-                if (show.isExplicit) {
-                    Icon(
-                        Icons.Default.Explicit,
-                        contentDescription = null
-                    )
-                }
-
-                trailingContent?.invoke()
-            }
-        }
-    }
+            trailingContent?.invoke()
+        },
+    )
 }

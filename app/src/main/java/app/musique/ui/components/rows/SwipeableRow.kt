@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -54,6 +56,12 @@ data class SwipeGesture(
     }
 }
 
+/**
+ * Background a swipeable row paints under its content. Lists inside a tinted card (grouped track
+ * lists, palette pages) provide the card color so rows don't punch black holes into it.
+ */
+val LocalRowContainerColor = compositionLocalOf { Color.Unspecified }
+
 @Composable
 fun SwipeableRowWithGestures(
     modifier: Modifier = Modifier,
@@ -61,7 +69,7 @@ fun SwipeableRowWithGestures(
     endGestures: List<SwipeGesture> = emptyList(),
     minIconSize: Dp = 14.dp,
     iconMaxSizeFraction: Float = 0.5f, // max icon size relative to content height
-    containerColor: Color = MaterialTheme.colorScheme.surface,
+    containerColor: Color = LocalRowContainerColor.current.takeOrElse { MaterialTheme.colorScheme.surface },
     content: @Composable () -> Unit
 ) {
     val scope = rememberCoroutineScope()

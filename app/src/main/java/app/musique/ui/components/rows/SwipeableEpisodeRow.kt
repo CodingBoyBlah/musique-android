@@ -43,6 +43,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueType
 import app.musique.ALBUM_COVER_URL
 import app.musique.R
 import app.musique.core.model.CoverSize
@@ -223,32 +226,29 @@ fun SharedTransitionScope.EpisodeRow(
             )
         } else Modifier
 
-    Surface(
-        color = tertiaryContainer.copy(alpha = 0.12f),
+    // Transparent row; the caller's modifier is applied once, on the outer element only.
+    Box(
         modifier = combinedModifier.semantics {
             contentDescription?.let { this.contentDescription = it }
         },
     ) {
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .padding(
-                    horizontal = 12.dp, vertical = when (density) {
-                        TrackRowDensity.Compact -> 6.dp
-                        TrackRowDensity.Default -> 8.dp
-                        TrackRowDensity.Spacious -> 12.dp
-                    }
+                    start = MusiqueDimens.screenPadding,
+                    end = 4.dp,
+                    top = density.verticalPadding() + 2.dp,
+                    bottom = density.verticalPadding() + 2.dp,
                 )
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
-                    .size(imageDp)
+                modifier = Modifier.size(imageDp)
             ) {
                 Surface(
                     color = color,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RowArtworkShape,
                     modifier = Modifier.size(imageDp)
                 ) {
                     SmartImage(
@@ -295,11 +295,8 @@ fun SharedTransitionScope.EpisodeRow(
             ) {
                 Text(
                     text = showName.uppercase(),
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.6.sp
-                    ),
-                    color = tertiary,
+                    style = MusiqueType.eyebrow,
+                    color = MusiqueColors.textTertiary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
@@ -318,15 +315,8 @@ fun SharedTransitionScope.EpisodeRow(
                     text = title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = when (density) {
-                            TrackRowDensity.Compact -> 14.sp
-                            TrackRowDensity.Default -> 16.sp
-                            TrackRowDensity.Spacious -> 18.sp
-                        }
-                    ),
-                    fontWeight = if (isLoaded) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isLoaded) tertiary else MaterialTheme.colorScheme.onSurface,
+                    style = MusiqueType.rowTitle,
+                    color = if (isLoaded) MaterialTheme.colorScheme.primary else MusiqueColors.textPrimary,
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(
@@ -346,15 +336,15 @@ fun SharedTransitionScope.EpisodeRow(
                     text = formatEpisodeMeta(publishTime, duration, fullyPlayed, resumePositionMs),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (!fullyPlayed && resumePositionMs > 0) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MusiqueType.rowSubtitle,
+                    color = if (!fullyPlayed && resumePositionMs > 0) MaterialTheme.colorScheme.primary else MusiqueColors.textSecondary,
                     modifier = Modifier.testTag("episoderow.meta")
                 )
             }
 
             Row(
-                modifier = Modifier.padding(end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(end = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (isLoaded) {
@@ -371,7 +361,9 @@ fun SharedTransitionScope.EpisodeRow(
                 if (isExplicit) {
                     Icon(
                         Icons.Default.Explicit,
-                        contentDescription = null
+                        contentDescription = null,
+                        tint = MusiqueColors.textTertiary,
+                        modifier = Modifier.size(15.dp),
                     )
                 }
 

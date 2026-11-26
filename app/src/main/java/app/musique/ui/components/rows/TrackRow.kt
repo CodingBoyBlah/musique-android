@@ -2,28 +2,29 @@ package app.musique.ui.components.rows
 
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explicit
+import androidx.compose.material.icons.rounded.Explicit
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -32,17 +33,40 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import app.musique.R
 import app.musique.core.model.Artist
 import app.musique.data.setting.LocalUiSettings
 import app.musique.ui.components.AudioBarsIndicator
 import app.musique.ui.components.SmartImage
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueType
 import app.musique.utils.SharedElementKey
 
 enum class TrackRowDensity { Compact, Default, Spacious }
 
+/** Artwork size for each density; Default is Apple Music's 48dp list artwork. */
+internal fun TrackRowDensity.artworkSize(): Dp = when (this) {
+    TrackRowDensity.Compact -> 40.dp
+    TrackRowDensity.Default -> MusiqueDimens.rowArtworkSize
+    TrackRowDensity.Spacious -> 64.dp
+}
+
+internal fun TrackRowDensity.verticalPadding(): Dp = when (this) {
+    TrackRowDensity.Compact -> 4.dp
+    TrackRowDensity.Default -> 6.dp
+    TrackRowDensity.Spacious -> 10.dp
+}
+
+/** Apple Music list row radius for square artwork. */
+internal val RowArtworkShape = RoundedCornerShape(8.dp)
+
+/**
+ * Apple Music style song row: 48dp artwork (8dp radius), [MusiqueType.rowTitle] title and a muted
+ * [MusiqueType.rowSubtitle] artist line, with a trailing slot for accessories such as `···`.
+ * The row itself is transparent so the list or grouped card behind it shows through.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TrackRow(
@@ -75,23 +99,31 @@ fun TrackRow(
 
     sharedTransitionScope: SharedTransitionScope? = null,
     sharedTransitionKey: String? = "${SharedElementKey.ALBUM_ARTWORK}_${artworkUrl}",
-    color: Color = MaterialTheme.colorScheme.surfaceVariant,
+    color: Color = MusiqueColors.cardRaised,
 ) {
-    val imageDp: Dp = when (density) {
-        TrackRowDensity.Compact -> 40.dp
-        TrackRowDensity.Default -> 56.dp
-        TrackRowDensity.Spacious -> 72.dp
-    }
-    val combinedModifier = if (onRowClick != null || onRowLongClick != null) {
-        modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = { onRowClick?.invoke() },
-                onLongClick = { onRowLongClick?.invoke() }
-            )
-    } else {
-        modifier.fillMaxWidth()
-    }
+    val imageDp = density.artworkSize()
+    val accent = MaterialTheme.colorScheme.primary
+
+    // The caller's modifier goes on the outer element only; reusing it on inner rows doubled
+    // padding and click handlers.
+    val rowModifier = modifier
+        .fillMaxWidth()
+        .then(
+            if (onRowClick != null || onRowLongClick != null) {
+                Modifier.combinedClickable(
+                    onClick = { onRowClick?.invoke() },
+                    onLongClick = { onRowLongClick?.invoke() }
+                )
+            } else Modifier
+        )
+        .semantics { contentDescription?.let { this.contentDescription = it } }
+        .heightIn(min = MusiqueDimens.rowHeight)
+        .padding(
+            start = MusiqueDimens.screenPadding,
+            end = 4.dp,
+            top = density.verticalPadding(),
+            bottom = density.verticalPadding(),
+        )
 
     val artworkModifier =
         if (sharedTransitionScope != null && sharedTransitionKey != null) {
@@ -103,163 +135,143 @@ fun TrackRow(
             }
         } else Modifier
 
-    Surface(
-        modifier = combinedModifier.semantics {
-            contentDescription?.let { this.contentDescription = it }
-        },
+    Row(
+        modifier = rowModifier,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = modifier
-                .padding(
-                    horizontal = 12.dp, vertical = when (density) {
-                        TrackRowDensity.Compact -> 6.dp
-                        TrackRowDensity.Default -> 8.dp
-                        TrackRowDensity.Spacious -> 12.dp
-                    }
-                )
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .size(imageDp)
+                .clip(RowArtworkShape)
+                .background(color),
+            contentAlignment = Alignment.Center,
         ) {
-            Surface(
-                color = color,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier
-                    .padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
-                    .size(imageDp)
-            ) {
-                SmartImage(
-                    url = artworkUrl,
-                    contentDescription = stringResource(R.string.common_artwork),
-                    modifier = artworkModifier
-                        .then(
-                            if (onArtworkClick != null) {
-                                Modifier.combinedClickable(
-                                    onClick = { onArtworkClick() },
-                                    onLongClick = {}
-                                )
-                            } else Modifier
-                        ),
-                    monochrome = LocalUiSettings.current.monochromeTracks
-                )
+            SmartImage(
+                url = artworkUrl,
+                contentDescription = stringResource(R.string.common_artwork),
+                shape = RowArtworkShape,
+                modifier = artworkModifier
+                    .then(
+                        if (onArtworkClick != null) {
+                            Modifier.combinedClickable(
+                                onClick = { onArtworkClick() },
+                                onLongClick = { onRowLongClick?.invoke() }
+                            )
+                        } else Modifier
+                    ),
+                monochrome = LocalUiSettings.current.monochromeTracks
+            )
+            if (isLoaded) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AudioBarsIndicator(
+                        isPlaying = isPlaying,
+                        barCount = 4,
+                        barWidth = 3.dp,
+                        barHeight = 14.dp,
+                        spacing = 2.dp,
+                        color = Color.White,
+                    )
+                }
             }
+        }
 
-            Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp),
-                verticalArrangement = Arrangement.Center
-            ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontSize = when (density) {
-                            TrackRowDensity.Compact -> 14.sp
-                            TrackRowDensity.Default -> 16.sp
-                            TrackRowDensity.Spacious -> 18.sp
-                        }
-                    ),
+                    style = MusiqueType.rowTitle,
+                    color = if (isLoaded) accent else MusiqueColors.textPrimary,
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .weight(1f, fill = false)
                         .then(
                             if (onTitleClick != null) {
                                 Modifier.combinedClickable(
                                     onClick = { onTitleClick() },
-                                    onLongClick = {}
+                                    onLongClick = { onRowLongClick?.invoke() }
                                 )
                             } else Modifier
                         )
                         .testTag("trackrow.title")
                 )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                // Artists
-                if (!showAlbumName) {
-                    Row(modifier = modifier) {
-                        artists.forEachIndexed { index, artist ->
-
-                            Text(
-                                text = artist.name,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier
-                                    .then(
-                                        if (onArtistClick != null) {
-                                            Modifier.combinedClickable(
-                                                onClick = { onArtistClick(artist) },
-                                                onLongClick = {}
-                                            )
-                                        } else Modifier
-                                    )
-                                    .testTag("trackrow.artist.$index")
-                            )
-
-                            // Add comma separator except after last
-                            if (index < artists.lastIndex) {
-                                Text(
-                                    text = ", ",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Text(
-                        text = albumName ?: "",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier
-                            .then(
-                                if (onArtworkClick != null) {
-                                    Modifier.combinedClickable(
-                                        onClick = { onArtworkClick?.invoke() },
-                                        onLongClick = {}
-                                    )
-                                } else Modifier
-                            )
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .padding(end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (isLoaded) {
-                    AudioBarsIndicator(
-                        isPlaying = isPlaying,
-                        barCount = 4,
-                        barWidth = 3.dp,
-                        barHeight = 12.dp,
-                        spacing = 3.dp,
-                        color = LocalContentColor.current
-                    )
-                }
-
                 if (isExplicit) {
+                    Spacer(Modifier.width(4.dp))
                     Icon(
-                        Icons.Default.Explicit,
-                        contentDescription = null
+                        Icons.Rounded.Explicit,
+                        contentDescription = null,
+                        tint = MusiqueColors.textTertiary,
+                        modifier = Modifier.size(15.dp),
                     )
                 }
-
-                if (isSelected) {
-                    Checkbox(
-                        checked = true,
-                        onCheckedChange = null
-                    )
-                }
-
-                trailingContent?.invoke()
             }
+
+            if (!showAlbumName) {
+                Row {
+                    artists.forEachIndexed { index, artist ->
+                        Text(
+                            text = if (index < artists.lastIndex) artist.name + ", " else artist.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MusiqueType.rowSubtitle,
+                            color = MusiqueColors.textSecondary,
+                            modifier = Modifier
+                                .then(
+                                    if (onArtistClick != null) {
+                                        Modifier.combinedClickable(
+                                            onClick = { onArtistClick(artist) },
+                                            onLongClick = { onRowLongClick?.invoke() }
+                                        )
+                                    } else Modifier
+                                )
+                                .testTag("trackrow.artist.$index")
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = albumName ?: "",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MusiqueType.rowSubtitle,
+                    color = MusiqueColors.textSecondary,
+                    modifier = Modifier
+                        .then(
+                            if (onArtworkClick != null) {
+                                Modifier.combinedClickable(
+                                    onClick = { onArtworkClick() },
+                                    onLongClick = { onRowLongClick?.invoke() }
+                                )
+                            } else Modifier
+                        )
+                )
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isSelected) {
+                Checkbox(
+                    checked = true,
+                    onCheckedChange = null
+                )
+            }
+
+            trailingContent?.invoke()
         }
     }
 }
