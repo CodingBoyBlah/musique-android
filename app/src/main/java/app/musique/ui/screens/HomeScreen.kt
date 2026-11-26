@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -67,6 +68,7 @@ import app.musique.ui.components.musique.SquareCard
 import app.musique.ui.components.musique.TopBarAccountActions
 import app.musique.ui.components.musique.rememberCollapseFraction
 import app.musique.ui.components.navigation.Route
+import app.musique.ui.components.rows.LocalRowContainerColor
 import app.musique.ui.components.rows.SwipeableTrackRowConfigured
 import app.musique.ui.theme.MusiqueColors
 import app.musique.ui.theme.MusiqueDimens
@@ -472,9 +474,11 @@ private fun HomeSquareSection(
                 containerColor = MusiqueColors.card,
                 modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding),
             ) {
-                trackItems.forEach { item ->
-                    key(item.uri) {
-                        trackRow(item)
+                CompositionLocalProvider(LocalRowContainerColor provides MusiqueColors.card) {
+                    trackItems.forEach { item ->
+                        key(item.uri) {
+                            trackRow(item)
+                        }
                     }
                 }
             }

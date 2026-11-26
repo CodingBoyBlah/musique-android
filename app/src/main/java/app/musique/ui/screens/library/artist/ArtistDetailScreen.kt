@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +76,7 @@ import app.musique.ui.components.musique.GroupedTrackItemContainer
 import app.musique.ui.components.musique.SectionHeader
 import app.musique.ui.components.musique.SquareCard
 import app.musique.ui.components.musique.rememberCollapseFraction
+import app.musique.ui.components.rows.LocalRowContainerColor
 import app.musique.ui.components.rows.SwipeableTrackRowConfigured
 import app.musique.ui.theme.MusiqueColors
 import app.musique.ui.theme.MusiqueDimens
@@ -225,6 +227,7 @@ fun SharedTransitionScope.ArtistDetailScreen(
                             containerColor = palette.surface,
                             dividerStartInset = 76.dp,
                         ) {
+                            CompositionLocalProvider(LocalRowContainerColor provides palette.surface) {
                             SwipeableTrackRowConfigured(
                                 track = track,
                                 currentAudio = currentTrack,
@@ -241,6 +244,7 @@ fun SharedTransitionScope.ArtistDetailScreen(
                                 onArtistClick = { onArtistClick(it) },
                                 onArtworkClick = { onArtworkClick(track) },
                             )
+                            }
                         }
                     }
 
