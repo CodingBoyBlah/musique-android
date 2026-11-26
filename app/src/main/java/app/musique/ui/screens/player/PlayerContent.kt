@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -299,6 +300,13 @@ private fun PortraitNowPlaying(
     val autoHide = rememberControlsAutoHide(lyricsMode, isPlaying)
     // Height of the bottom chrome with the controls showing; the lyrics keep clear of it.
     var bottomChromeHeight by remember { mutableStateOf(0.dp) }
+    // Height of the drawer alone: when the controls auto hide, the lyrics extend down to it.
+    var drawerHeight by remember { mutableStateOf(0.dp) }
+    val lyricsBottomPadding by animateDpAsState(
+        targetValue = if (autoHide.visible || drawerHeight == 0.dp) bottomChromeHeight else drawerHeight,
+        animationSpec = MusiqueMotion.lyricScroll(),
+        label = "lyricsBottomPadding",
+    )
 
     val thumbX = 20.dp
     val thumbY = statusTop + 12.dp + (LyricsHeaderHeight - 12.dp - MusiqueDimens.lyricsCompactArtSize) / 2
@@ -313,7 +321,7 @@ private fun PortraitNowPlaying(
                     .graphicsLayer { alpha = lyricsFraction.value },
                 contentPadding = PaddingValues(
                     top = statusTop + LyricsHeaderHeight,
-                    bottom = bottomChromeHeight,
+                    bottom = lyricsBottomPadding,
                 ),
                 onUserScrollingChange = { scrolling ->
                     autoHide.userScrolling = scrolling
@@ -406,7 +414,9 @@ private fun PortraitNowPlaying(
                 }
             }
 
-            chrome.drawer(bottomInset, true)
+            Box(Modifier.onSizeChanged { drawerHeight = with(density) { it.height.toDp() } }) {
+                chrome.drawer(bottomInset, true)
+            }
         }
     }
 }
