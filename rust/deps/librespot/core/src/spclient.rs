@@ -106,9 +106,24 @@ impl Default for RequestOptions {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 pub struct TransferRequest {
     pub transfer_options: TransferOptions,
+}
+
+fn encode_path_component(value: &str) -> String {
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char);
+            }
+            _ => {
+                let _ = write!(encoded, "%{byte:02X}");
+            }
+        }
+    }
+    encoded
 }
 
 impl SpClient {
@@ -439,6 +454,79 @@ impl SpClient {
             .await
     }
 
+    async fn build_request(
+        &self,
+        method: &Method,
+        endpoint: &str,
+        headers: Option<&HeaderMap>,
+        body: &[u8],
+        options: &RequestOptions,
+    ) -> Result<Request<Bytes>, Error> {
+        // Reconnection logic: retrieve the endpoint every iteration, so we can try
+        // another access point when we are experiencing network issues.
+        let mut url = match options.base_url {
+            Some(base_url) => base_url.to_string(),
+            None => self.base_url().await?,
+        };
+        url.push_str(endpoint);
+
+        // Add metrics. There is also an optional `partner` key with a value like
+        // `vodafone-uk` but we've yet to discover how we can find that value.
+        // For the sake of documentation you could also do "product=free" but
+        // we only support premium anyway.
+        if options.metrics && !url.contains("product=0") {
+            let _ = write!(
+                url,
+                "{}product=0&country={}",
+                util::get_next_query_separator(&url),
+                self.session().country()
+            );
+        }
+
+        // Defeat caches. Spotify-generated URLs already contain this.
+        if options.salt && !url.contains("salt=") {
+            let _ = write!(
+                url,
+                "{}salt={}",
+                util::get_next_query_separator(&url),
+                rand::rng().next_u32()
+            );
+        }
+
+        let mut request = Request::builder()
+            .method(method)
+            .uri(url)
+            .header(CONTENT_LENGTH, body.len())
+            .body(Bytes::copy_from_slice(body))?;
+
+        // Reconnection logic: keep getting (cached) tokens because they might have expired.
+        let token = self.session().login5().auth_token().await?;
+
+        let headers_mut = request.headers_mut();
+        if let Some(headers) = headers {
+            for (name, value) in headers {
+                headers_mut.insert(name, value.clone());
+            }
+        }
+
+        headers_mut.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token,))?,
+        );
+
+        match self.client_token().await {
+            Ok(client_token) => {
+                let _ = headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
+            }
+            Err(e) => {
+                // currently these endpoints seem to work fine without it
+                warn!("Unable to get client token: {e} Trying to continue without...")
+            }
+        }
+
+        Ok(request)
+    }
+
     pub async fn request_with_options(
         &self,
         method: &Method,
@@ -455,67 +543,9 @@ impl SpClient {
         loop {
             tries += 1;
 
-            // Reconnection logic: retrieve the endpoint every iteration, so we can try
-            // another access point when we are experiencing network issues (see below).
-            let mut url = match options.base_url {
-                Some(base_url) => base_url.to_string(),
-                None => self.base_url().await?,
-            };
-            url.push_str(endpoint);
-
-            // Add metrics. There is also an optional `partner` key with a value like
-            // `vodafone-uk` but we've yet to discover how we can find that value.
-            // For the sake of documentation you could also do "product=free" but
-            // we only support premium anyway.
-            if options.metrics && !url.contains("product=0") {
-                let _ = write!(
-                    url,
-                    "{}product=0&country={}",
-                    util::get_next_query_separator(&url),
-                    self.session().country()
-                );
-            }
-
-            // Defeat caches. Spotify-generated URLs already contain this.
-            if options.salt && !url.contains("salt=") {
-                let _ = write!(
-                    url,
-                    "{}salt={}",
-                    util::get_next_query_separator(&url),
-                    rand::rng().next_u32()
-                );
-            }
-
-            let mut request = Request::builder()
-                .method(method)
-                .uri(url)
-                .header(CONTENT_LENGTH, body.len())
-                .body(Bytes::copy_from_slice(body))?;
-
-            // Reconnection logic: keep getting (cached) tokens because they might have expired.
-            let token = self.session().login5().auth_token().await?;
-
-            let headers_mut = request.headers_mut();
-            if let Some(ref headers) = headers {
-                for (name, value) in headers {
-                    headers_mut.insert(name, value.clone());
-                }
-            }
-
-            headers_mut.insert(
-                AUTHORIZATION,
-                HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token,))?,
-            );
-
-            match self.client_token().await {
-                Ok(client_token) => {
-                    let _ = headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
-                }
-                Err(e) => {
-                    // currently these endpoints seem to work fine without it
-                    warn!("Unable to get client token: {e} Trying to continue without...")
-                }
-            }
+            let request = self
+                .build_request(method, endpoint, headers.as_ref(), body, options)
+                .await?;
 
             last_response = self.session().http_client().request_body(request).await;
 
@@ -958,5 +988,56 @@ impl SpClient {
             &NO_METRICS_AND_SALT,
         )
         .await
+    }
+
+    /// Triggers a single-attempt playback transfer without replaying ambiguous failures.
+    ///
+    /// Runs `guard` after resolving endpoints and tokens, immediately before the HTTP attempt.
+    pub async fn transfer_once(
+        &self,
+        from_device_id: &str,
+        to_device_id: &str,
+        transfer_request: Option<&TransferRequest>,
+        guard: impl FnOnce() -> Result<(), Error>,
+    ) -> SpClientResult {
+        let body = transfer_request.map(serde_json::to_string).transpose()?;
+        let endpoint = format!(
+            "/connect-state/v1/connect/transfer/from/{}/to/{}",
+            encode_path_component(from_device_id),
+            encode_path_component(to_device_id),
+        );
+
+        let mut headers = HeaderMap::new();
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        if body.is_some() {
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        }
+        let connection_id = self.session().connection_id();
+        if !connection_id.is_empty() {
+            headers.insert(CONNECTION_ID, connection_id.parse()?);
+        }
+
+        let request = self
+            .build_request(
+                &Method::POST,
+                &endpoint,
+                Some(&headers),
+                body.as_deref().unwrap_or_default().as_bytes(),
+                &NO_METRICS_AND_SALT,
+            )
+            .await?;
+
+        guard()?;
+
+        let response = self.session().http_client().request_body_once(request).await;
+        if let Err(ref network_error) = response {
+            if matches!(
+                network_error.kind,
+                ErrorKind::Unavailable | ErrorKind::DeadlineExceeded
+            ) {
+                self.flush_accesspoint().await;
+            }
+        }
+        response
     }
 }
