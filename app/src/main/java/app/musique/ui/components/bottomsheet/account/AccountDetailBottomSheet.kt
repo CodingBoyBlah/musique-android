@@ -1,5 +1,10 @@
 package app.musique.ui.components.bottomsheet.account
 
+import app.musique.ui.components.bottomsheet.SheetActionGroup
+import app.musique.ui.components.bottomsheet.SheetActionRow
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,23 +62,23 @@ fun AccountDetailBottomSheet(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp)
         ) {
             AccountAvatar(
                 isLoggedIn = isLoggedIn,
                 name = displayName,
                 imageUrl = userImageUrl,
                 screenshotMode = screenshotMode,
-                size = 96.dp
+                size = 88.dp
             )
 
             Text(
                 text = displayName ?: title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                style = MusiqueType.heroTitle,
+                color = MusiqueColors.textPrimary,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -85,43 +90,31 @@ fun AccountDetailBottomSheet(
 
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                style = MusiqueType.body,
+                color = MusiqueColors.textSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 8.dp)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             if (isLoggedIn) {
-                Button(
-                    onClick = {
-                        onLogout()
-                        onDismiss()
-                    },
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Logout,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.common_logout),
-                        style = MaterialTheme.typography.labelLarge
+                SheetActionGroup {
+                    SheetActionRow(
+                        label = stringResource(R.string.common_logout),
+                        icon = Icons.AutoMirrored.Rounded.Logout,
+                        destructive = true,
+                        onClick = {
+                            onLogout()
+                            onDismiss()
+                        }
                     )
                 }
             } else {
                 Text(
                     text = stringResource(R.string.account_login_in_progress),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MusiqueType.caption,
+                    color = MusiqueColors.textTertiary,
                     textAlign = TextAlign.Center
                 )
             }

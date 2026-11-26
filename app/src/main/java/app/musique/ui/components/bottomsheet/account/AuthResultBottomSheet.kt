@@ -1,5 +1,9 @@
 package app.musique.ui.components.bottomsheet.account
 
+import app.musique.ui.components.bottomsheet.SheetExplainer
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.ui.res.stringResource
+import app.musique.R
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,45 +39,31 @@ fun AuthResultBottomSheet(
     MusiqueModalSheet(
         onDismissRequest = onDismiss,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(
-                if (isSuccess) Icons.Default.DoneAll else Icons.Default.Error,
-                contentDescription = null
-            )
-
-            // Main message
-            Text(
-                text = message,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-
-            // Error details (if applicable)
-            if (!isSuccess && errorDetails != null) {
-                Text(
-                    text = errorDetails,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .padding(bottom = 16.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = RoundedCornerShape(8.dp),
-                        )
-                        .padding(12.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
+        SheetExplainer(
+            icon = if (isSuccess) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline,
+            iconTint = if (isSuccess) app.musique.ui.components.SettingsDefaults.tintGreen
+            else app.musique.ui.components.bottomsheet.MusiqueSheetDefaults.destructive,
+            title = message,
+            body = null,
+            primaryText = stringResource(R.string.common_done),
+            onPrimary = onDismiss,
+            extra = if (!isSuccess && errorDetails != null) {
+                {
+                    Text(
+                        text = errorDetails,
+                        style = app.musique.ui.theme.MusiqueType.rowDuration,
+                        color = app.musique.ui.theme.MusiqueColors.textSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = app.musique.ui.components.bottomsheet.MusiqueSheetDefaults.groupColor,
+                                shape = RoundedCornerShape(12.dp),
+                            )
+                            .padding(12.dp),
+                    )
+                }
+            } else null,
+        )
     }
 }

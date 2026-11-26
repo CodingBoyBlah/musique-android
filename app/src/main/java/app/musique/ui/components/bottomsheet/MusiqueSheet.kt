@@ -550,3 +550,135 @@ fun SheetContent(
         content = content
     )
 }
+
+/**
+ * Explanatory sheet body (permissions, sign in results): hero glyph, title, copy, a white
+ * pill and an optional text button.
+ */
+@Composable
+fun SheetExplainer(
+    icon: ImageVector,
+    title: String,
+    body: String?,
+    modifier: Modifier = Modifier,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
+    primaryText: String? = null,
+    onPrimary: (() -> Unit)? = null,
+    secondaryText: String? = null,
+    onSecondary: (() -> Unit)? = null,
+    extra: (@Composable ColumnScope.() -> Unit)? = null,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(top = 8.dp, bottom = 16.dp)
+    ) {
+        SheetHeroIcon(icon = icon, tint = iconTint)
+        Spacer(Modifier.height(20.dp))
+        Text(
+            text = title,
+            style = MusiqueType.heroTitle,
+            color = MusiqueColors.textPrimary,
+            textAlign = TextAlign.Center
+        )
+        if (!body.isNullOrBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = body,
+                style = MusiqueType.body,
+                color = MusiqueColors.textSecondary,
+                textAlign = TextAlign.Center
+            )
+        }
+        if (extra != null) {
+            Spacer(Modifier.height(16.dp))
+            extra()
+        }
+        if (primaryText != null && onPrimary != null) {
+            Spacer(Modifier.height(28.dp))
+            SheetButtonRow(
+                primaryText = primaryText,
+                onPrimary = onPrimary,
+                secondaryText = secondaryText,
+                onSecondary = onSecondary,
+            )
+        }
+    }
+}
+
+/** Borderless form field for use inside a [SheetActionGroup], like an iOS form cell. */
+@Composable
+fun SheetTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    singleLine: Boolean = true,
+    maxLines: Int = if (singleLine) 1 else 4,
+    enabled: Boolean = true,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions =
+        androidx.compose.foundation.text.KeyboardOptions.Default,
+) {
+    val style = MusiqueType.rowTitle.copy(
+        color = MusiqueColors.textPrimary,
+        fontWeight = MusiqueType.body.fontWeight
+    )
+    androidx.compose.foundation.text.BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        enabled = enabled,
+        singleLine = singleLine,
+        maxLines = maxLines,
+        keyboardOptions = keyboardOptions,
+        textStyle = style,
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = MusiqueSheetDefaults.actionRowHeight)
+            .padding(horizontal = 16.dp, vertical = 15.dp),
+        decorationBox = { inner ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(placeholder, style = style.copy(color = MusiqueColors.textTertiary))
+                }
+                inner()
+            }
+        }
+    )
+}
+
+/** Row with a label, optional supporting text and an accent switch, inside a sheet group. */
+@Composable
+fun SheetSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    supportingText: String? = null,
+    enabled: Boolean = true,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = MusiqueSheetDefaults.actionRowHeight)
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
+            .alpha(if (enabled) 1f else 0.45f)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MusiqueType.rowTitle, color = MusiqueColors.textPrimary)
+            if (supportingText != null) {
+                Text(supportingText, style = MusiqueType.cardSubtitle, color = MusiqueColors.textTertiary)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        app.musique.ui.components.SettingsSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+        )
+    }
+}
