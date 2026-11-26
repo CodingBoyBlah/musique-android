@@ -1,11 +1,6 @@
 package app.musique.ui.screens.library.track
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,72 +8,61 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeExtendedFloatingActionButton
-import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import app.musique.ALBUM_COVER_URL
-import app.musique.fabBottomPadding
 import app.musique.R
 import app.musique.ScreenBottomPadding
 import app.musique.core.model.Album
-import app.musique.core.model.Artist
 import app.musique.core.model.CoverSize
 import app.musique.core.model.LyricLine
 import app.musique.core.model.getCover
 import app.musique.core.model.sharedTransitionKey
 import app.musique.core.model.toSpotifyUri
-import app.musique.ui.components.ArtworkBackground
-import app.musique.ui.components.CollapsingHeader
+import app.musique.data.setting.LocalUiSettings
 import app.musique.ui.components.ErrorScreen
-import app.musique.ui.components.SmartImage
 import app.musique.ui.components.TrackDetailSkeleton
-import app.musique.ui.components.rememberCollapsingHeaderState
-import app.musique.ui.components.rows.SwipeableTrackRowConfigured
+import app.musique.ui.components.musique.ActionSquircleButton
+import app.musique.ui.components.musique.DetailFloatingTopBar
+import app.musique.ui.components.musique.DetailHeroHeader
+import app.musique.ui.components.musique.DetailPaletteGradientBackdrop
+import app.musique.ui.components.musique.GroupedTrackItemContainer
+import app.musique.ui.components.musique.GroupedTrackList
+import app.musique.ui.components.musique.SectionHeader
+import app.musique.ui.components.musique.formatTrackDuration
+import app.musique.ui.components.rows.AlbumRow
+import app.musique.ui.components.rows.ArtistRow
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueType
+import app.musique.ui.theme.rememberArtworkPalette
 import app.musique.ui.viewmodel.detail.TrackDetailViewModel
-import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SharedTransitionScope.TrackDetailScreen(
     viewModel: TrackDetailViewModel,
@@ -88,230 +72,196 @@ fun SharedTransitionScope.TrackDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-
     when {
         uiState.isLoading -> {
-            TrackDetailSkeleton()
+            Box(Modifier.fillMaxSize().background(MusiqueColors.canvas)) {
+                TrackDetailSkeleton()
+                DetailFloatingTopBar(title = "", collapseFraction = 0f, onBack = onBack)
+            }
         }
 
         uiState.error != null -> {
-            ErrorScreen(
-                message = uiState.error!!,
-                onRetry = { viewModel.retry() },
-            )
+            Box(Modifier.fillMaxSize().background(MusiqueColors.canvas)) {
+                ErrorScreen(
+                    message = uiState.error!!,
+                    onRetry = { viewModel.retry() },
+                )
+                DetailFloatingTopBar(title = "", collapseFraction = 0f, onBack = onBack)
+            }
         }
 
         uiState.track != null -> {
             val track = uiState.track!!
             val lyrics = uiState.lyrics
-            val artworkUrl = ALBUM_COVER_URL + track.album?.getCover(CoverSize.LARGE)?.uri
-            val currentTrack by viewModel.currentAudio.collectAsState(initial = null)
-            val isPlaybackPlaying by viewModel.isPlaying.collectAsState(initial = false)
+            val album = track.album
+            val artworkUrl = (album?.getCover(CoverSize.LARGE) ?: album?.getCover(CoverSize.MEDIUM))
+                ?.uri?.let { ALBUM_COVER_URL + it }
+            val paletteUrl = (album?.getCover(CoverSize.SMALL) ?: album?.getCover(CoverSize.MEDIUM))
+                ?.uri?.let { ALBUM_COVER_URL + it } ?: artworkUrl
+            val palette = rememberArtworkPalette(paletteUrl)
             val spirc = viewModel.spirc
 
             val likedTrackIds by viewModel.likedTrackIds.collectAsState()
+            val isLiked = track.id in likedTrackIds
 
-            val lazyList = rememberLazyListState()
+            val lazyList = androidx.compose.foundation.lazy.rememberLazyListState()
+            val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val collapseFraction = app.musique.ui.components.musique.rememberCollapseFraction(
+                lazyList,
+                thresholdDp = 280.dp,
+            )
 
-            val collapsingState = rememberCollapsingHeaderState()
-            val atTop by remember {
-                derivedStateOf {
-                    lazyList.firstVisibleItemIndex == 0 &&
-                            lazyList.firstVisibleItemScrollOffset == 0
-                }
-            }
-            SideEffect { collapsingState.canExpand = atTop }
+            val songLabel = stringResource(R.string.common_track)
+            val metadataLine = listOfNotNull(
+                songLabel,
+                album?.name,
+                album?.date?.takeIf { it.isSet() }?.year?.toString(),
+                formatTrackDuration(track.duration),
+            ).joinToString(" · ")
 
-            val isScrolled by remember {
-                derivedStateOf {
-                    lazyList.firstVisibleItemIndex > 2 ||
-                            lazyList.firstVisibleItemScrollOffset > 100
-                }
-            }
-            val showScrollToTop = isScrolled
-
-            LaunchedEffect(lazyList.isScrollInProgress) {
-                if (!lazyList.isScrollInProgress) {
-                    val canExpand =
-                        lazyList.firstVisibleItemIndex == 0 &&
-                                lazyList.firstVisibleItemScrollOffset == 0
-
-                    collapsingState.snapIfNeeded(canExpand)
-                }
+            val play: () -> Unit = {
+                spirc.load(track.toSpotifyUri())
+                viewModel.setTrack(track)
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(color = MaterialTheme.colorScheme.surface)
-                    .nestedScroll(collapsingState.nestedScrollConnection)
-            ) {
-                val currentTopBarHeightDp =
-                    with(density) { collapsingState.height.value.toDp() }
+            Box(modifier = Modifier.fillMaxSize()) {
+                DetailPaletteGradientBackdrop(palette = palette)
 
                 LazyColumn(
                     state = lazyList,
                     contentPadding = PaddingValues(
-                        top = currentTopBarHeightDp,
+                        top = statusBarTop + MusiqueDimens.collapsedBarHeight + 12.dp,
+                        bottom = ScreenBottomPadding + 24.dp,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
                 ) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.common_track),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
-                        )
-                    }
-
-                    item(key = "track_row") {
-                        SwipeableTrackRowConfigured(
-                            track = track,
-                            currentAudio = currentTrack,
-                            isPlaybackPlaying = isPlaybackPlaying,
-                            onRowClick = remember(track.uri) {
-                                {
-                                    spirc.load(track.toSpotifyUri())
-                                    viewModel.setTrack(track)
-                                }
+                    item(key = "track_hero") {
+                        DetailHeroHeader(
+                            title = track.name,
+                            artworkUrl = artworkUrl,
+                            creatorName = track.artists.joinToString(", ") { it.name },
+                            creatorAvatarUrls = track.artists.mapNotNull { artist ->
+                                artist.getCover(CoverSize.SMALL)?.uri?.let { ALBUM_COVER_URL + it }
                             },
-                            isLiked = track.id in likedTrackIds,
-                            onArtistClick = { artistClick(it.uri) },
-                            onArtworkClick = { artworkClick(track.album) },
+                            metadataLine = metadataLine,
+                            onCreatorClick = track.artists.firstOrNull()?.let { first ->
+                                { artistClick(first.uri) }
+                            },
+                            monochrome = LocalUiSettings.current.monochromeTracks,
+                            artworkModifier = album?.let {
+                                Modifier.sharedBounds(
+                                    rememberSharedContentState(it.sharedTransitionKey()),
+                                    LocalNavAnimatedContentScope.current,
+                                )
+                            } ?: Modifier,
                         )
                     }
 
-                    if (lyrics.isNotEmpty()) {
-                        item {
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Text(
-                                text = stringResource(R.string.common_lyrics),
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
+                    item(key = "track_actions") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            ActionSquircleButton(
+                                onClick = play,
+                                containerColor = Color.White,
+                                contentColor = MusiqueColors.onDarkPlay,
+                                modifier = Modifier
+                                    .weight(0.76f)
+                                    .height(MusiqueDimens.actionButtonHeight),
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(22.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(stringResource(R.string.detail_play), style = MusiqueType.button, maxLines = 1)
+                                }
+                            }
+                            ActionSquircleButton(
+                                onClick = { viewModel.toggleLike(track.uri) },
+                                containerColor = palette.surface.copy(alpha = 0.94f),
+                                contentColor = MusiqueColors.textPrimary,
+                                modifier = Modifier
+                                    .weight(0.24f)
+                                    .height(MusiqueDimens.actionButtonHeight),
+                            ) {
+                                Icon(
+                                    imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                    contentDescription = stringResource(R.string.common_liked),
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
+                    }
+
+                    if (album != null) {
+                        item(key = "track_album_header") {
+                            SectionHeader(
+                                title = stringResource(R.string.detail_album_type),
+                                modifier = Modifier.padding(top = 8.dp, bottom = 10.dp),
                             )
                         }
-
-                        item(key = "lyrics") {
-                            LyricsSection(lyrics = lyrics)
+                        item(key = "track_album") {
+                            GroupedTrackItemContainer(index = 0, count = 1, containerColor = palette.surface) {
+                                AlbumRow(
+                                    album = album,
+                                    artworkUrl = album.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+                                    onRowClick = { artworkClick(album) },
+                                    sharedTransitionKey = null,
+                                )
+                            }
                         }
                     }
 
                     if (track.artists.isNotEmpty()) {
-                        item {
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Text(
-                                text = stringResource(R.string.search_section_artists),
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
+                        item(key = "track_artists_header") {
+                            SectionHeader(
+                                title = stringResource(R.string.search_section_artists),
+                                modifier = Modifier.padding(top = 24.dp, bottom = 10.dp),
                             )
                         }
-
-                        items(
-                            items = track.artists,
-                            key = { "artist_${it.uri}" }
-                        ) { artist ->
-                            ArtistRow(
-                                artist = artist,
-                                onClick = { artistClick(artist.uri) },
-                            )
-                        }
-                    }
-
-                    item {
-                        Spacer(Modifier.height(ScreenBottomPadding))
-                    }
-                }
-
-                CollapsingHeader(
-                    collapseFraction = collapsingState.collapseFraction,
-                    headerHeight = currentTopBarHeightDp,
-                    onBackPressed = onBack,
-                    backgroundContent = {
-                        ArtworkBackground(
-                            artworkUrl = artworkUrl,
-                            modifier = track.album?.let { album ->
-                                Modifier.sharedBounds(
-                                    rememberSharedContentState(album.sharedTransitionKey()),
-                                    LocalNavAnimatedContentScope.current
+                        itemsIndexed(track.artists, key = { _, artist -> "artist_${artist.uri}" }) { index, artist ->
+                            GroupedTrackItemContainer(
+                                index = index,
+                                count = track.artists.size,
+                                containerColor = palette.surface,
+                                dividerStartInset = 76.dp,
+                            ) {
+                                ArtistRow(
+                                    artist = artist,
+                                    artworkUrl = artist.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+                                    onRowClick = { artistClick(artist.uri) },
+                                    sharedTransitionKey = null,
                                 )
-                            } ?: Modifier
-                        )
-                    },
-                    titleContent = {
-                        Text(
-                            text = track.name,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-
-                        Text(
-                            text = buildString {
-                                append(track.artists.joinToString { it.name })
-                                track.album?.let { album ->
-                                    append(" • ${album.name}")
-                                }
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                    fabContent = {
-                        LargeExtendedFloatingActionButton(
-                            onClick = {
-                                spirc.load(track.toSpotifyUri())
-                                viewModel.setTrack(track)
-                            },
-                            shape = MaterialShapes.Cookie9Sided.toShape()
-                        ) {
-                            Icon(Icons.Rounded.PlayArrow, null)
-                        }
-                    },
-                    actionButtonContent = {
-                        FilledIconButton(onClick = { viewModel.toggleLike(track.uri) }) {
-                            Icon(
-                                imageVector = if (track.id in likedTrackIds)
-                                    Icons.Rounded.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = if (track.id in likedTrackIds)
-                                    "Unlike" else "Like"
-                            )
+                            }
                         }
                     }
-                )
 
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.BottomEnd
-                ) {
-                    AnimatedVisibility(
-                        visible = showScrollToTop,
-                        enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-                        exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
-                    ) {
-                        FloatingActionButton(
-                            onClick = {
-                                scope.launch {
-                                    lazyList.scrollToItem(0)
-                                }
-                            },
-                            shape = CircleShape,
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier
-                                .padding(end = 16.dp, bottom = fabBottomPadding(currentTrack != null))
-                                .size(40.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.KeyboardArrowUp,
-                                contentDescription = stringResource(R.string.common_scroll_to_top)
+                    if (lyrics.isNotEmpty()) {
+                        item(key = "track_lyrics_header") {
+                            SectionHeader(
+                                title = stringResource(R.string.common_lyrics),
+                                modifier = Modifier.padding(top = 24.dp, bottom = 10.dp),
                             )
+                        }
+                        item(key = "track_lyrics") {
+                            GroupedTrackList(
+                                containerColor = palette.surface,
+                                modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding),
+                            ) {
+                                LyricsSection(lyrics = lyrics)
+                            }
                         }
                     }
                 }
+
+                DetailFloatingTopBar(
+                    title = track.name,
+                    collapseFraction = collapseFraction,
+                    onBack = onBack,
+                    tintColor = palette.backgroundTop,
+                )
             }
         }
     }
@@ -322,63 +272,15 @@ private fun LyricsSection(lyrics: List<LyricLine>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         lyrics.forEach { line ->
             Text(
                 text = line.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MusiqueType.body,
+                color = MusiqueColors.textSecondary,
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Start,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ArtistRow(
-    artist: Artist,
-    onClick: () -> Unit,
-) {
-    val artistCoverUrl = ALBUM_COVER_URL + artist.getCover(CoverSize.MEDIUM)?.uri
-
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        tonalElevation = 1.dp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(56.dp)
-            ) {
-                SmartImage(
-                    url = artistCoverUrl,
-                    contentDescription = artist.name,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Text(
-                text = artist.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }
