@@ -1,5 +1,7 @@
 package app.musique.ui.components
 
+import app.musique.ui.theme.MusiqueType
+import app.musique.ui.theme.MusiqueColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -19,14 +21,13 @@ fun ScreenshotAvatar(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(40.dp)
-            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            .background(MusiqueColors.accent, CircleShape),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = stringResource(R.string.screenshot_mode_avatar),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer
+            style = MusiqueType.sectionTitle,
+            color = androidx.compose.ui.graphics.Color.White
         )
     }
 }

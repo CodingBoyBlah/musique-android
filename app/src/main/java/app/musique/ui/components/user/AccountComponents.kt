@@ -1,5 +1,9 @@
 package app.musique.ui.components.user
 
+import app.musique.ui.theme.MusiqueType
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,11 +45,8 @@ fun AccountAvatar(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(size)
-            .clip(MaterialShapes.Cookie9Sided.toShape())
-            .background(
-                if (isLoggedIn) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.secondaryContainer
-            )
+            .clip(CircleShape)
+            .background(Color(0xFF4A4A4C))
     ) {
         when {
             isLoggedIn && screenshotMode -> ScreenshotAvatar(Modifier.fillMaxSize())
@@ -56,15 +57,14 @@ fun AccountAvatar(
             )
             isLoggedIn && !name.isNullOrBlank() -> Text(
                 text = name.first().uppercase(),
-                style = if (size >= 80.dp) MaterialTheme.typography.displaySmall
-                else MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
+                style = MusiqueType.largeTitle.copy(fontSize = (size.value * 0.42f).sp),
+                color = Color.White
             )
             else -> Icon(
-                imageVector = Icons.AutoMirrored.Filled.Login,
+                imageVector = Icons.Rounded.Person,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(size * 0.44f)
+                tint = Color(0xFF8E8E93),
+                modifier = Modifier.size(size * 0.6f)
             )
         }
     }
@@ -76,18 +76,18 @@ fun StatusPill(text: String, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
-            .background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .background(Color(0xFF30D158).copy(alpha = 0.14f), CircleShape)
+            .padding(horizontal = 9.dp, vertical = 3.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(8.dp)
-                .background(MaterialTheme.colorScheme.tertiary, CircleShape)
+                .size(7.dp)
+                .background(Color(0xFF30D158), CircleShape)
         )
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onTertiaryContainer
+            style = MusiqueType.caption,
+            color = Color(0xFF30D158)
         )
     }
 }

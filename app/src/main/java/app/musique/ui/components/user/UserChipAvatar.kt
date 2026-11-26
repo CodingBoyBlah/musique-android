@@ -1,5 +1,8 @@
 package app.musique.ui.components.user
 
+import app.musique.ui.theme.MusiqueColors
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -25,17 +28,14 @@ fun UserChipAvatar(
     Box(
         modifier = modifier
             .size(size)
-            .clip(MaterialShapes.Circle.toShape())
+            .clip(CircleShape)
+            .background(MusiqueColors.chrome)
     ) {
-        Surface(
-            tonalElevation = 12.dp
-        ) {
-            SmartImage(
-                url = artworkUrl,
-                modifier = Modifier
-                    .fillMaxWidth(),
-                monochrome = LocalUiSettings.current.monochromeArtists
-            )
-        }
+        SmartImage(
+            url = artworkUrl,
+            shape = CircleShape,
+            modifier = Modifier.fillMaxWidth(),
+            monochrome = LocalUiSettings.current.monochromeArtists
+        )
     }
 }
