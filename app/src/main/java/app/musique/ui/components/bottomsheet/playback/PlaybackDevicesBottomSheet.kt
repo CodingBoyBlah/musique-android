@@ -1,5 +1,13 @@
 package app.musique.ui.components.bottomsheet.playback
 
+import app.musique.ui.components.bottomsheet.*
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
@@ -98,64 +106,52 @@ fun PlaybackDevicesBottomSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = MusiqueSheetDefaults.horizontalPadding)
+                .padding(top = 4.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    Icons.Default.Devices,
-                    contentDescription = stringResource(R.string.cd_devices),
-                    modifier = Modifier
-                        .clip(MaterialShapes.Cookie9Sided.toShape())
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(12.dp)
-                        .size(20.dp)
+                SheetTitle(
+                    text = stringResource(R.string.devices_title),
+                    subtitle = stringResource(R.string.count_devices, devices.size),
+                    modifier = Modifier.weight(1f)
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.devices_title),
-                        style = MaterialTheme.typography.headlineMediumEmphasized,
-                        fontWeight = FontWeight.Black,
-                    )
-
-                    Text(
-                        text = stringResource(R.string.count_devices, devices.size),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                IconButton(
-                    onClick = {
-                        scope.launch {
-                            viewModel.makeActive(deviceState.lease)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val canTransfer = deviceState.available && deviceState.localDeviceId != null &&
+                        deviceState.transferringDeviceId == null
+                    SheetRoundButton(
+                        icon = Icons.Rounded.SwapHoriz,
+                        contentDescription = stringResource(R.string.cd_transfer_playback),
+                        tint = if (canTransfer) MusiqueColors.textPrimary else MusiqueColors.textTertiary,
+                        onClick = {
+                            if (canTransfer) scope.launch { viewModel.makeActive(deviceState.lease) }
                         }
-                    },
-                    enabled = deviceState.available && deviceState.localDeviceId != null && deviceState.transferringDeviceId == null,
-                ) {
-                    Icon(Icons.Default.SwapHoriz, contentDescription = stringResource(R.string.cd_transfer_playback))
-                }
-
-                IconButton(
-                    onClick = {
-                        scope.launch {
-                            viewModel.loadDevices()
+                    )
+                    val canRefresh = deviceState.available && !deviceState.isRefreshing
+                    SheetRoundButton(
+                        icon = Icons.Rounded.Refresh,
+                        contentDescription = stringResource(R.string.cd_refresh_devices),
+                        tint = if (canRefresh) MusiqueColors.textPrimary else MusiqueColors.textTertiary,
+                        onClick = {
+                            if (canRefresh) scope.launch { viewModel.loadDevices() }
                         }
-                    },
-                    enabled = deviceState.available && !deviceState.isRefreshing,
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_refresh_devices))
+                    )
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            if (deviceState.isRefreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (deviceState.isRefreshing) {
+                LinearProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MusiqueSheetDefaults.groupColor,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(CircleShape)
+                )
+            }
             deviceState.error?.let { message ->
                 Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
@@ -179,7 +175,7 @@ fun PlaybackDevicesBottomSheet(
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 if (devices.isEmpty()) {
                     item {
@@ -209,115 +205,107 @@ fun PlaybackDevicesBottomSheet(
                     }
                 }
 
-                items(devices, key = { it.id ?: it.name }) {
+                itemsIndexed(devices, key = { _, d -> d.id ?: d.name }) { index, it ->
                     val icon = when (it.type) {
-                        "Computer" -> Icons.Default.Laptop
-                        "Smartphone" -> Icons.Default.Smartphone
-                        "Speaker" -> Icons.Default.Speaker
-                        else -> Icons.Default.DeviceUnknown
+                        "Computer" -> Icons.Rounded.Laptop
+                        "Smartphone" -> Icons.Rounded.Smartphone
+                        "Speaker" -> Icons.Rounded.Speaker
+                        else -> Icons.Rounded.DeviceUnknown
                     }
-
                     val isSelected = it.isActive
+                    val corner = 14.dp
+                    val shape = RoundedCornerShape(
+                        topStart = if (index == 0) corner else 0.dp,
+                        topEnd = if (index == 0) corner else 0.dp,
+                        bottomStart = if (index == devices.lastIndex) corner else 0.dp,
+                        bottomEnd = if (index == devices.lastIndex) corner else 0.dp,
+                    )
+                    val accent = MaterialTheme.colorScheme.primary
 
-                    Card(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(
-                                enabled = deviceState.available && deviceState.transferringDeviceId == null && !it.isRestricted && !it.isActive,
-                            ) { viewModel.selectDevice(it, deviceState.lease) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected)
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        )
+                            .clip(shape)
+                            .background(MusiqueSheetDefaults.groupColor)
                     ) {
-                        ListItem(
-                            headlineContent = {
+                        if (index > 0) SheetDivider(inset = 64.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(
+                                    enabled = deviceState.available && deviceState.transferringDeviceId == null && !it.isRestricted && !it.isActive,
+                                ) { viewModel.selectDevice(it, deviceState.lease) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isSelected) accent else Color.White.copy(alpha = 0.1f))
+                            ) {
+                                Icon(
+                                    icon,
+                                    contentDescription = null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MusiqueColors.textPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(Modifier.width(14.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = it.name,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
+                                    style = MusiqueType.rowTitle,
+                                    color = if (isSelected) accent else MusiqueColors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            },
-                            supportingContent = {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    if (it.isRestricted) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Lock,
-                                                contentDescription = stringResource(R.string.common_restricted),
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.common_restricted),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                    if (it.isPrivateSession) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Security,
-                                                contentDescription = stringResource(R.string.common_private),
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.common_private),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            },
-                            leadingContent = {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.size(48.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
+                                if (it.isRestricted || it.isPrivateSession) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            icon,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp)
-                                        )
+                                        if (it.isRestricted) DeviceTag(Icons.Rounded.Lock, stringResource(R.string.common_restricted))
+                                        if (it.isPrivateSession) DeviceTag(Icons.Rounded.Security, stringResource(R.string.common_private))
                                     }
-                                }
-                            },
-                            trailingContent = {
-                                if (deviceState.transferringDeviceId == it.id) {
-                                    CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
-                                } else if (isSelected) {
-                                    AudioBarsIndicator(
-                                        isPlaying = deviceState.isPlaying,
-                                        barCount = 4,
-                                        barWidth = 3.dp,
-                                        barHeight = 12.dp,
-                                        spacing = 3.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
                                 }
                             }
-                        )
+
+                            if (deviceState.transferringDeviceId == it.id) {
+                                CircularProgressIndicator(
+                                    color = accent,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            } else if (isSelected) {
+                                AudioBarsIndicator(
+                                    isPlaying = deviceState.isPlaying,
+                                    barCount = 4,
+                                    barWidth = 3.dp,
+                                    barHeight = 12.dp,
+                                    spacing = 3.dp,
+                                    color = accent
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun DeviceTag(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = MusiqueColors.textTertiary, modifier = Modifier.size(13.dp))
+        Text(text = label, style = MusiqueType.cardSubtitle, color = MusiqueColors.textTertiary)
     }
 }
