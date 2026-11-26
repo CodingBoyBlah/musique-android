@@ -314,6 +314,8 @@ fun PlaybackSettingScreen(
                 }
             }
         }
+
+        item { LastFmSection() }
     }
 }
 

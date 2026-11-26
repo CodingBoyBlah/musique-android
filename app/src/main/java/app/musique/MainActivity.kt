@@ -148,6 +148,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appUpdater: AppUpdater
 
+    @Inject
+    lateinit var lastFmScrobbler: app.musique.core.lastfm.LastFmScrobbler
+
     private val deepLinkFlow = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
 
     @Volatile
@@ -187,6 +190,7 @@ class MainActivity : ComponentActivity() {
 
         volumeController.start()
         appUpdater.checkOnLaunch()
+        lastFmScrobbler.start()
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // Dark only: light status and navigation bar icons whatever the system theme is.
