@@ -1,5 +1,12 @@
 package app.musique.ui.components.bottomsheet.playlist
 
+import app.musique.ui.components.bottomsheet.*
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.*
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import android.content.ClipData
 import android.content.Intent
@@ -100,217 +107,88 @@ fun PlaylistInfoBottomSheet(
         onDismissRequest = onDismiss,
         modifier = modifier,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        SheetContent(
+            modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .size(imageSize)
-                        .clickable {
-                            onOpenPlaylist?.invoke()
-                            onDismiss()
-                        }
-                ) {
-                    SmartImage(
-                        url = artworkUrl,
-                        contentDescription = stringResource(R.string.common_artwork),
-                        modifier = Modifier.fillMaxSize(),
-                        monochrome = LocalUiSettings.current.monochromePlaylists
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = playlist.attributes.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
+            SheetMediaHeader(
+                artworkUrl = artworkUrl,
+                title = playlist.attributes.name,
+                monochrome = LocalUiSettings.current.monochromePlaylists,
+                onArtworkClick = {
+                    onOpenPlaylist?.invoke()
+                    onDismiss()
+                },
+                subtitle = {
                     Text(
                         text = stringResource(R.string.count_tracks, playlist.length),
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
+                        style = MusiqueType.rowSubtitle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
-
-                Row {
-                    IconButton(
+                },
+                trailing = {
+                    SheetRoundButton(
+                        icon = Icons.Rounded.Favorite,
+                        contentDescription = stringResource(R.string.like),
                         onClick = {
                             onToggleLike?.invoke()
                             onDismiss()
-                        },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Favorite,
-                            contentDescription = stringResource(R.string.like),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { defaultShare() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.common_share))
-                    }
-
-                    IconButton(
-                        onClick = { defaultCopy() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.common_copy_link))
-                    }
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            Text(
-                text = stringResource(R.string.common_open),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                        }
+                    )
+                },
+                modifier = Modifier.padding(bottom = 4.dp)
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionCard(
-                    icon = Icons.Default.PlayArrow,
-                    title = stringResource(R.string.menu_open_playlist),
-                    subtitle = stringResource(R.string.menu_browse_tracks),
-                    onClick = {
-                        onOpenPlaylist?.invoke()
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                ActionCard(
-                    icon = Icons.Default.Person,
-                    title = stringResource(R.string.menu_creator),
-                    subtitle = stringResource(R.string.menu_click_open_profile),
-                    onClick = {
-                        onOpenCreator?.invoke()
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            Text(
-                text = stringResource(R.string.common_queue),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionCard(
-                    icon = Icons.Default.Queue,
-                    title = stringResource(R.string.common_add_to_queue),
-                    subtitle = stringResource(R.string.common_end_of_queue),
-                    onClick = {
-                        onAddToQueue?.invoke()
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                ActionCard(
-                    icon = Icons.AutoMirrored.Filled.QueueMusic,
-                    title = stringResource(R.string.common_play_next),
-                    subtitle = stringResource(R.string.common_up_next),
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SheetQuickAction(
+                    icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
+                    label = stringResource(R.string.common_play_next),
                     onClick = {
                         onPlayNext?.invoke()
                         onDismiss()
                     },
                     modifier = Modifier.weight(1f)
                 )
+                SheetQuickAction(
+                    icon = Icons.AutoMirrored.Rounded.QueueMusic,
+                    label = stringResource(R.string.sheet_play_last),
+                    onClick = {
+                        onAddToQueue?.invoke()
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                SheetQuickAction(
+                    icon = Icons.Rounded.IosShare,
+                    label = stringResource(R.string.common_share),
+                    onClick = { defaultShare() },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun ActionCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    isHighlighted: Boolean = false,
-    highlightColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceVariant
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = highlightColor.copy(alpha = 0.5f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier
-                    .clip(MaterialShapes.Cookie9Sided.toShape())
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(10.dp)
-                    .size(20.dp),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            SheetActionGroup {
+                SheetActionRow(
+                    label = stringResource(R.string.menu_open_playlist),
+                    icon = Icons.AutoMirrored.Rounded.QueueMusic,
+                    onClick = {
+                        onOpenPlaylist?.invoke()
+                        onDismiss()
+                    }
                 )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(R.string.sheet_go_to_profile),
+                    icon = Icons.Rounded.Person,
+                    onClick = {
+                        onOpenCreator?.invoke()
+                        onDismiss()
+                    }
+                )
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(R.string.common_copy_link),
+                    icon = Icons.Rounded.Link,
+                    onClick = { defaultCopy() }
                 )
             }
         }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Context sheets -->
+    <string name="sheet_go_to_album">Go to Album</string>
+    <string name="sheet_go_to_artist">Go to Artist</string>
+    <string name="sheet_go_to_profile">Go to Creator</string>
+    <string name="sheet_add_to_liked">Add to Liked Songs</string>
+    <string name="sheet_remove_from_liked">Remove from Liked Songs</string>
+    <string name="sheet_play_last">Play Last</string>
+</resources>

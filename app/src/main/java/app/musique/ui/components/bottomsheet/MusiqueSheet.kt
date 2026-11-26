@@ -413,3 +413,140 @@ fun SheetHeroIcon(
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(36.dp))
     }
 }
+
+/**
+ * Header of a context sheet: artwork, title and subtitle, with optional trailing buttons
+ * (like a heart). [subtitle] is a slot so callers can make artist names tappable.
+ */
+@Composable
+fun SheetMediaHeader(
+    artworkUrl: String?,
+    title: String,
+    modifier: Modifier = Modifier,
+    artworkShape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(8.dp),
+    monochrome: Boolean? = null,
+    onArtworkClick: (() -> Unit)? = null,
+    subtitle: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(artworkShape)
+                .background(MusiqueSheetDefaults.groupColor)
+                .then(if (onArtworkClick != null) Modifier.clickable(onClick = onArtworkClick) else Modifier)
+        ) {
+            app.musique.ui.components.SmartImage(
+                url = artworkUrl,
+                shape = artworkShape,
+                monochrome = monochrome,
+                modifier = Modifier.matchParentSize()
+            )
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MusiqueType.cardTitle.copy(fontSize = MusiqueType.rowTitle.fontSize),
+                color = MusiqueColors.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (subtitle != null) {
+                CompositionLocalProvider(LocalContentColor provides MusiqueColors.textTertiary) {
+                    subtitle()
+                }
+            }
+        }
+
+        if (trailing != null) {
+            Spacer(Modifier.width(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) { trailing() }
+        }
+    }
+}
+
+/** Round 36dp translucent button used in sheet headers (like, share). */
+@Composable
+fun SheetRoundButton(
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MusiqueColors.textPrimary,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(36.dp)
+            .pressScale(interaction, pressedScale = 0.88f)
+            .clip(CircleShape)
+            .background(MusiqueSheetDefaults.groupColor)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** One of the square tiles in the quick action strip at the top of iOS context menus. */
+@Composable
+fun SheetQuickAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+        modifier = modifier
+            .height(72.dp)
+            .pressScale(interaction, pressedScale = 0.96f)
+            .clip(MusiqueSheetDefaults.groupShape)
+            .background(
+                if (pressed) MusiqueSheetDefaults.groupColor.copy(alpha = 0.7f)
+                else MusiqueSheetDefaults.groupColor
+            )
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 6.dp)
+    ) {
+        Icon(icon, contentDescription = null, tint = MusiqueColors.textPrimary, modifier = Modifier.size(22.dp))
+        Text(
+            text = label,
+            style = MusiqueType.caption,
+            color = MusiqueColors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/** Standard padding wrapper for sheet content. */
+@Composable
+fun SheetContent(
+    modifier: Modifier = Modifier,
+    spacing: Dp = 12.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = MusiqueSheetDefaults.horizontalPadding)
+            .padding(bottom = 20.dp),
+        content = content
+    )
+}

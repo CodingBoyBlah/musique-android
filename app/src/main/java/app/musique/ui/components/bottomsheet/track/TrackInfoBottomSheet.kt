@@ -1,5 +1,12 @@
 package app.musique.ui.components.bottomsheet.track
 
+import app.musique.ui.components.bottomsheet.*
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.*
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueType
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import android.content.ClipData
 import android.content.Intent
@@ -123,333 +130,181 @@ fun TrackInfoBottomSheet(
         onDismissRequest = onDismiss,
         modifier = modifier,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        SheetContent(
+            modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
-            // Header: artwork + title + artists + share/copy icons
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .size(imageSize)
-                        .clickable {
-                            onArtworkClick?.invoke()
-                            onDismiss()
-                        }
-                ) {
-                    SmartImage(
-                        url = artworkUrl,
-                        contentDescription = stringResource(R.string.common_artwork),
-                        modifier = Modifier.fillMaxSize(),
-                        monochrome = LocalUiSettings.current.monochromeTracks
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = track.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    val artists = track.artists
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        artists.forEachIndexed { index, artist ->
-                            Text(
-                                text = artist.name,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.primary
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.clickable {
-                                    onArtistClick?.invoke(artist)
-                                    onDismiss()
-                                }
-                            )
-
-                            if (index < artists.lastIndex) {
-                                Text(
-                                    text = ", ",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Header icons: like, share, copy
-                Row {
-                    IconButton(
-                        onClick = {
-                            onAddToWidget?.invoke()
-                            onDismiss
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Widgets,
-                            contentDescription = stringResource(R.string.cd_add_to_widget)
-                        )
-                    }
-
-                    IconButton(
+            SheetMediaHeader(
+                artworkUrl = artworkUrl,
+                title = track.name,
+                monochrome = LocalUiSettings.current.monochromeTracks,
+                onArtworkClick = {
+                    onArtworkClick?.invoke()
+                    onDismiss()
+                },
+                subtitle = { ArtistLinks(track.artists, onArtistClick, onDismiss) },
+                trailing = {
+                    SheetRoundButton(
+                        icon = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        contentDescription = stringResource(R.string.like),
+                        tint = if (isLiked) MusiqueColors.accent else MusiqueColors.textPrimary,
                         onClick = {
                             onToggleLike?.invoke()
                             onDismiss()
-                        },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = stringResource(R.string.like),
-                            tint = if (isLiked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { onShare?.invoke() ?: defaultShare() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.common_share))
-                    }
-
-                    IconButton(
-                        onClick = { onCopyUri?.invoke() ?: defaultCopy() },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.common_copy_link))
-                    }
-                }
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Open section
-            Text(
-                text = stringResource(R.string.common_open),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                        }
+                    )
+                },
+                modifier = Modifier.padding(bottom = 4.dp)
             )
 
-            ActionCard(
-                icon = Icons.Default.Album,
-                title = stringResource(R.string.common_album),
-                subtitle = track.album?.name ?: "",
-                onClick = {
-                    onOpenAlbum?.invoke()
-                    onDismiss()
-                }
-            )
-
-            ActionCard(
-                icon = Icons.Default.Person,
-                title = stringResource(R.string.common_artist),
-                subtitle = track.artists.joinToString { it.name },
-                onClick = {
-                    onOpenArtist?.invoke()
-                    onDismiss()
-                }
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Queue section
-            Text(
-                text = stringResource(R.string.common_queue),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionCard(
-                    icon = Icons.Default.Queue,
-                    title = stringResource(R.string.common_add_to_queue),
-                    subtitle = stringResource(R.string.common_end_of_queue),
-                    onClick = {
-                        onAddToQueue?.invoke()
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                ActionCard(
-                    icon = Icons.AutoMirrored.Filled.PlaylistAdd,
-                    title = stringResource(R.string.common_play_next),
-                    subtitle = stringResource(R.string.common_up_next),
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SheetQuickAction(
+                    icon = Icons.AutoMirrored.Rounded.PlaylistPlay,
+                    label = stringResource(R.string.common_play_next),
                     onClick = {
                         onPlayNext?.invoke()
                         onDismiss()
                     },
                     modifier = Modifier.weight(1f)
                 )
+                SheetQuickAction(
+                    icon = Icons.AutoMirrored.Rounded.QueueMusic,
+                    label = stringResource(R.string.sheet_play_last),
+                    onClick = {
+                        onAddToQueue?.invoke()
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                SheetQuickAction(
+                    icon = Icons.Rounded.IosShare,
+                    label = stringResource(R.string.common_share),
+                    onClick = { onShare?.invoke() ?: defaultShare() },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
-            ActionCard(
-                icon = Icons.AutoMirrored.Filled.PlaylistAdd,
-                title = stringResource(R.string.menu_add_to_playlist),
-                subtitle = stringResource(R.string.menu_save_to_playlist),
-                onClick = {
-                    onAddToPlaylist?.invoke()
-                    onDismiss()
-                }
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-            // Playback section
-            Text(
-                text = stringResource(R.string.common_playback),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ActionCard(
-                    icon = Icons.Default.Favorite,
-                    title = stringResource(R.string.like),
-                    subtitle = if (likedTrackIndex != null && likedTrackIndex >= 0) stringResource(R.string.liked_in_liked_songs) else stringResource(R.string.liked_add_to_liked),
+            SheetActionGroup {
+                SheetActionRow(
+                    label = stringResource(R.string.menu_add_to_playlist),
+                    icon = Icons.AutoMirrored.Rounded.PlaylistAdd,
+                    onClick = {
+                        onAddToPlaylist?.invoke()
+                        onDismiss()
+                    }
+                )
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(
+                        if (isLiked) R.string.sheet_remove_from_liked else R.string.sheet_add_to_liked
+                    ),
+                    icon = if (isLiked) Icons.Rounded.HeartBroken else Icons.Rounded.FavoriteBorder,
+                    destructive = isLiked,
                     onClick = {
                         onToggleLike?.invoke()
                         onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    isHighlighted = true,
-                    highlightColor = MaterialTheme.colorScheme.tertiaryContainer
+                    }
                 )
-
-                ActionCard(
-                    icon = Icons.Default.Radio,
-                    title = stringResource(R.string.menu_start_radio),
-                    subtitle = stringResource(R.string.menu_play_similar),
-                    onClick = {
-                        onStartRadio?.invoke()
-                        onDismiss()
-                    },
-                    modifier = Modifier.weight(1f),
-                    isHighlighted = true,
-                    highlightColor = MaterialTheme.colorScheme.primaryContainer
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(R.string.common_copy_link),
+                    icon = Icons.Rounded.Link,
+                    onClick = { onCopyUri?.invoke() ?: defaultCopy() }
+                )
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(R.string.cd_add_to_widget),
+                    icon = Icons.Rounded.Widgets,
+                    onClick = { onAddToWidget?.invoke() }
                 )
             }
 
-            ActionCard(
-                icon = Icons.Default.AutoAwesome,
-                title = stringResource(R.string.menu_recommendation_seed),
-                subtitle = stringResource(R.string.menu_discover_tracks),
-                onClick = {
-                    onUseAsRecommendationSeed?.invoke()
-                    onDismiss()
-                }
-            )
-
-            ActionCard(
-                icon = Icons.Default.Radio,
-                title = stringResource(R.string.menu_open_radio),
-                subtitle = stringResource(R.string.menu_view_radio_playlist),
-                onClick = {
-                    onOpenRadio?.invoke()
-                    onDismiss()
-                }
-            )
-
-            // Show liked track index if available
-            if (likedTrackIndex != null && likedTrackIndex >= 0) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-                ActionCard(
-                    icon = Icons.Default.Favorite,
-                    title = stringResource(R.string.menu_in_liked_songs),
-                    subtitle = stringResource(R.string.liked_position, likedTrackIndex + 1),
+            SheetActionGroup {
+                SheetActionRow(
+                    label = stringResource(R.string.sheet_go_to_album),
+                    supportingText = track.album?.name,
+                    icon = Icons.Rounded.Album,
                     onClick = {
-                        onScrollToLiked?.invoke()
+                        onOpenAlbum?.invoke()
+                        onDismiss()
+                    }
+                )
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(R.string.sheet_go_to_artist),
+                    supportingText = track.artists.joinToString { it.name },
+                    icon = Icons.Rounded.Person,
+                    onClick = {
+                        onOpenArtist?.invoke()
+                        onDismiss()
+                    }
+                )
+                if (likedTrackIndex != null && likedTrackIndex >= 0) {
+                    SheetDivider()
+                    SheetActionRow(
+                        label = stringResource(R.string.menu_in_liked_songs),
+                        supportingText = stringResource(R.string.liked_position, likedTrackIndex + 1),
+                        icon = Icons.Rounded.Favorite,
+                        onClick = {
+                            onScrollToLiked?.invoke()
+                            onDismiss()
+                        }
+                    )
+                }
+            }
+
+            SheetActionGroup {
+                SheetActionRow(
+                    label = stringResource(R.string.menu_start_radio),
+                    icon = Icons.Rounded.Radio,
+                    onClick = {
+                        onStartRadio?.invoke()
+                        onDismiss()
+                    }
+                )
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(R.string.menu_open_radio),
+                    icon = Icons.Rounded.Podcasts,
+                    onClick = {
+                        onOpenRadio?.invoke()
+                        onDismiss()
+                    }
+                )
+                SheetDivider()
+                SheetActionRow(
+                    label = stringResource(R.string.menu_recommendation_seed),
+                    icon = Icons.Rounded.AutoAwesome,
+                    onClick = {
+                        onUseAsRecommendationSeed?.invoke()
                         onDismiss()
                     }
                 )
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** Comma separated artist names; each name opens that artist. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ActionCard(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    isHighlighted: Boolean = false,
-    highlightColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surfaceVariant
+private fun ArtistLinks(
+    artists: List<Artist>,
+    onArtistClick: ((Artist) -> Unit)?,
+    onDismiss: () -> Unit,
 ) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(
-            containerColor = highlightColor.copy(alpha = 0.5f)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier
-                    .clip(MaterialShapes.Cookie9Sided.toShape())
-                    .background(MaterialTheme.colorScheme.secondaryContainer)
-                    .padding(10.dp)
-                    .size(20.dp),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer
+    FlowRow {
+        artists.forEachIndexed { index, artist ->
+            Text(
+                text = artist.name + if (index < artists.lastIndex) ", " else "",
+                style = MusiqueType.rowSubtitle,
+                color = MusiqueColors.textTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable {
+                    onArtistClick?.invoke(artist)
+                    onDismiss()
+                }
             )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
     }
 }
