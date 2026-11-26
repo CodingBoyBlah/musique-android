@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.jam
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import android.content.ClipData
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -39,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -125,10 +125,9 @@ fun JamManageBottomSheet(
         if (available) viewModel.refreshJam()
     }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier,
     ) {
         LazyColumn(

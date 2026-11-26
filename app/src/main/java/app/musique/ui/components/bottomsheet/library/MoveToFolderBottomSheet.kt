@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.library
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +24,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.toShape
@@ -58,10 +58,9 @@ fun MoveToFolderBottomSheet(
         }
     }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = { dismiss() },
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         Column(
             modifier = Modifier

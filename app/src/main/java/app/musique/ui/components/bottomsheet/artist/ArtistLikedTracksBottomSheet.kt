@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.artist
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +26,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -67,7 +67,7 @@ fun SharedTransitionScope.ArtistLikedTracksBottomSheet(
 
     val coroutineScope = rememberCoroutineScope()
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = {
             coroutineScope.launch {
                 onDismiss()
@@ -76,7 +76,6 @@ fun SharedTransitionScope.ArtistLikedTracksBottomSheet(
         },
         sheetState = sheetState,
         modifier = modifier,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         when (uiState) {
             ArtistUiState.Loading -> {

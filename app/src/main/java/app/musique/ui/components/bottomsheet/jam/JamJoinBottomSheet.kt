@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.jam
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
@@ -32,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
@@ -95,11 +95,10 @@ fun JoinJamBottomSheet(
         viewModel.load(jamToken)
     }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier

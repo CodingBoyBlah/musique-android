@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.playlist
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +24,6 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -78,7 +78,7 @@ fun TrackSelectionBottomSheet(
     val tracksToProcess = tracks.filter { it.id in selectedTrackIds }
     val alreadyPresentCount = tracks.count { it.id in playlistTrackIds }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = {
             coroutineScope.launch {
                 sheetState.hide()
@@ -86,7 +86,6 @@ fun TrackSelectionBottomSheet(
             }
         },
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         Column(
             modifier = Modifier

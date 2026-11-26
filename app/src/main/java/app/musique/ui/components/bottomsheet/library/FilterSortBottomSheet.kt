@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.library
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +15,6 @@ import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -43,9 +43,9 @@ fun FilterSortBottomSheet(
     sortAscending: Boolean,
     onSortAscendingChange: (Boolean) -> Unit,
 ) {
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = onDismissRequest,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier

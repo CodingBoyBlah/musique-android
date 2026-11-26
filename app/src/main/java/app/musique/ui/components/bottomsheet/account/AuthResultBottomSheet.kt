@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.account
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,7 +15,6 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,11 +32,8 @@ fun AuthResultBottomSheet(
     errorDetails: String? = null,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
             modifier = Modifier

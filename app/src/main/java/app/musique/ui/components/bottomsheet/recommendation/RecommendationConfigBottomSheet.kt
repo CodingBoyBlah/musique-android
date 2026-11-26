@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.recommendation
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -15,7 +16,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SliderState
@@ -60,7 +60,7 @@ fun RecommendationConfigBottomSheet(
     var valence by remember { mutableStateOf<Float?>(null) }
     var featureWeight by remember { mutableStateOf<Float?>(null) }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = {
             coroutineScope.launch {
                 sheetState.hide()
@@ -68,7 +68,6 @@ fun RecommendationConfigBottomSheet(
             }
         },
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         LazyColumn(
             modifier = Modifier

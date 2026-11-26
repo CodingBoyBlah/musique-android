@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.widget
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +29,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -69,11 +69,10 @@ fun AddToWidgetBottomSheet(
 
     val trackCoverUrl = track.album?.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = { coroutineScope.launch { onDismiss?.invoke() } },
         sheetState = sheetState,
         modifier = modifier,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         LazyColumn(
             modifier = Modifier

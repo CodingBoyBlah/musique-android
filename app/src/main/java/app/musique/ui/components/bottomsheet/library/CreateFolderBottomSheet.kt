@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.library
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
 import androidx.compose.foundation.background
@@ -24,7 +25,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -64,7 +64,7 @@ fun CreateFolderBottomSheet(
     var name by remember { mutableStateOf(initialName) }
     var selectedColor by remember { mutableStateOf(initialColor) }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = {
             coroutineScope.launch {
                 sheetState.hide()
@@ -72,7 +72,6 @@ fun CreateFolderBottomSheet(
             }
         },
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         Column(
             modifier = Modifier

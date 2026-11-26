@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.permissions
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
 import androidx.compose.foundation.layout.Column
@@ -19,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,7 +42,7 @@ fun NotificationPermissionBottomSheet(
     modifier: Modifier = Modifier,
     sheetState: SheetState = rememberModalBottomSheetState(),
 ) {
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         modifier = modifier,

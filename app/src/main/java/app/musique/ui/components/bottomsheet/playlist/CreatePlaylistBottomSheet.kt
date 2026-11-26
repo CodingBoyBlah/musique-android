@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.playlist
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
 import androidx.compose.foundation.background
@@ -24,7 +25,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -92,7 +92,7 @@ fun CreatePlaylistBottomSheet(
         }
     }
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = {
             if (!isSaving) {
                 coroutineScope.launch {
@@ -102,7 +102,6 @@ fun CreatePlaylistBottomSheet(
             }
         },
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier,
     ) {
         Column(

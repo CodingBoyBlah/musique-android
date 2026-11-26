@@ -1,5 +1,6 @@
 package app.musique.ui.components.bottomsheet.playback
 
+import app.musique.ui.components.bottomsheet.MusiqueModalSheet
 import app.musique.R
 
 import androidx.compose.foundation.background
@@ -41,7 +42,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.Slider
@@ -88,13 +88,11 @@ fun PlaybackDevicesBottomSheet(
     val playback by viewModel.playback.collectAsState()
     val controlError by viewModel.controlError.collectAsState()
 
-    ModalBottomSheet(
+    MusiqueModalSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = modifier
             .fillMaxWidth(),
-        tonalElevation = 3.dp,
     ) {
         Column(
             modifier = Modifier
