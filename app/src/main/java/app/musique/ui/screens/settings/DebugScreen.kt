@@ -92,6 +92,12 @@ import app.musique.data.setting.LocalUiSettings
 import app.musique.ScreenBottomPadding
 import app.musique.ui.viewmodel.settings.DebugViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.content.Context
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.OutlinedButton
 
 private sealed interface DebugRow {
     val label: String
@@ -163,6 +169,7 @@ fun DebugScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     val clipboard = LocalClipboard.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var includeSensitive by rememberSaveable { mutableStateOf(false) }
@@ -170,7 +177,7 @@ fun DebugScreen(
 
     fun copy(text: String) {
         scope.launch {
-            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Outify debug", text)))
+            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Musique debug", text)))
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 snackbarHostState.showSnackbar(copiedMessage)
             }
@@ -248,6 +255,19 @@ fun DebugScreen(
                                 else R.string.debug_spirc_restart
                             )
                         )
+                    }
+                    OutlinedButton(
+                        onClick = { scope.launch { sharePlaybackLog(context) } },
+                        shapes = ButtonDefaults.shapes(),
+                        contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp)
+                            .height(ButtonDefaults.MediumContainerHeight)
+                    ) {
+                        Icon(Icons.Rounded.Share, contentDescription = null)
+                        Spacer(Modifier.width(ButtonDefaults.iconSpacingFor(ButtonDefaults.MediumContainerHeight)))
+                        Text(stringResource(R.string.debug_share_log))
                     }
                 }
             )
@@ -528,4 +548,26 @@ fun String.redact(visible: Int = 2): String {
     return take(visible) +
             ".".repeat(3) +
             takeLast(visible)
+}
+
+/** Shares this process's recent logcat (Kotlin and librespot) so playback problems can be diagnosed. */
+private suspend fun sharePlaybackLog(context: Context) {
+    val log = withContext(Dispatchers.IO) {
+        runCatching {
+            val process = ProcessBuilder(
+                "logcat", "-d", "-v", "time", "-t", "4000", "--pid=${android.os.Process.myPid()}"
+            ).redirectErrorStream(true).start()
+            process.inputStream.bufferedReader().use { it.readText() }
+        }.getOrElse { "Could not read the log: ${it.message}" }
+    }
+    val header = "Musique ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}), " +
+        "Android ${Build.VERSION.RELEASE}, ${Build.MANUFACTURER} ${Build.MODEL}" + "\n\n"
+    val file = java.io.File(context.cacheDir, "musique-log.txt").apply { writeText(header + log) }
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.logs", file)
+    val send = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_STREAM, uri)
+        .putExtra(Intent.EXTRA_SUBJECT, "Musique playback log")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
