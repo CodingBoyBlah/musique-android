@@ -38,8 +38,8 @@ class AboutViewModel : ViewModel() {
 }
 
 object UpdateChecker {
-    private const val LATEST_RELEASE_API = "https://api.github.com/repos/iTomKo/Outify/releases/latest"
-    private const val FALLBACK_PAGE = "https://github.com/iTomKo/Outify/releases/latest"
+    private const val LATEST_RELEASE_API = "https://api.github.com/repos/CodingBoyBlah/musique-android/releases/latest"
+    private const val FALLBACK_PAGE = "https://github.com/CodingBoyBlah/musique-android/releases/latest"
 
     /** Blocking, call from Dispatchers.IO. */
     fun check(currentVersion: String): UpdateState = try {
@@ -53,7 +53,7 @@ object UpdateChecker {
             connectTimeout = 10_000
             readTimeout = 10_000
             // GitHub's API rejects requests without a User-Agent
-            setRequestProperty("User-Agent", "Outify")
+            setRequestProperty("User-Agent", "Musique")
             setRequestProperty("Accept", "application/vnd.github+json")
         }
 

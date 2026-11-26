@@ -77,8 +77,8 @@ import app.musique.ui.viewmodel.AboutViewModel
 import app.musique.ui.viewmodel.UpdateState
 
 private const val DEVELOPER = "TomKo"
-private const val GITHUB_URL = "https://github.com/iTomKo/Outify"
-private const val GITHUB_DISPLAY = "github.com/iTomKo/Outify"
+private const val GITHUB_URL = "https://github.com/CodingBoyBlah/musique-android"
+private const val GITHUB_DISPLAY = "github.com/CodingBoyBlah/musique-android"
 
 private sealed interface AboutItem {
     data class Info(val label: String, val value: String) : AboutItem
@@ -158,7 +158,6 @@ fun AboutScreen(
 
 @Composable
 private fun Hero(modifier: Modifier = Modifier) {
-    val accent = MaterialTheme.colorScheme.primary
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -171,21 +170,19 @@ private fun Hero(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .size(96.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.55f).compositeOver(Color.Black)))
-                )
+                .background(Brush.verticalGradient(listOf(Color(0xFF111C3B), Color(0xFF0A122A))))
         ) {
             Icon(
                 imageVector = MyIcons.Logo,
-                contentDescription = "Outify",
-                tint = Color.White,
-                modifier = Modifier.size(48.dp)
+                contentDescription = "Musique",
+                tint = Color.Unspecified,
+                modifier = Modifier.size(96.dp)
             )
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Outify",
+                text = "Musique",
                 style = MusiqueType.heroTitle,
                 color = MusiqueColors.textPrimary
             )

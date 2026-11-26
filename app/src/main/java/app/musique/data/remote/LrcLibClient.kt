@@ -51,7 +51,7 @@ class LrcLibClient @Inject constructor(
         .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
-    private val userAgent = "Outify/${BuildConfig.VERSION_NAME} (https://github.com/iTomKo/Outify)"
+    private val userAgent = "Musique/${BuildConfig.VERSION_NAME} (https://github.com/CodingBoyBlah/musique-android)"
 
     suspend fun getLyrics(track: Track): List<LyricLine> = withContext(Dispatchers.IO) {
         val title = track.name.trim()

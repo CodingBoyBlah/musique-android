@@ -52,7 +52,7 @@ object Spirc {
 
     /**
      * Initializes the SpircRuntime
-     * @param deviceName The device name shown in Spotify Connect (default "Outify")
+     * @param deviceName The device name shown in Spotify Connect (default "Musique")
      */
     @JvmStatic
     external fun initializeSpirc(
@@ -61,7 +61,7 @@ object Spirc {
         normalisation: Boolean,
         bitrateSpeed: Int = Bitrate.KBPS320.getSpeed(),
         crossfadeMillis: Int = 5_000,
-        deviceName: String = "Outify"
+        deviceName: String = "Musique"
     ): Boolean
 
     /**
@@ -83,7 +83,7 @@ object Spirc {
         normalisation: Boolean,
         bitrateSpeed: Int = Bitrate.KBPS320.getSpeed(),
         crossfadeMillis: Int = 5_000,
-        deviceName: String = "Outify",
+        deviceName: String = "Musique",
         autoTransfer: Boolean = true,
     ): Boolean
 

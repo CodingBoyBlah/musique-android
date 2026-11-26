@@ -285,10 +285,10 @@ fun PlaybackSettingScreen(
                 entry {
                     DebouncedTextEntry(
                         title = stringResource(R.string.settings_connect_name),
-                        placeholder = "Outify",
+                        placeholder = "Musique",
                         icon = Icons.Default.Smartphone,
                         saved = settings.deviceName,
-                        normalize = { it.ifBlank { "Outify" } },
+                        normalize = { it.ifBlank { "Musique" } },
                         onCommit = { viewModel.setDeviceName(it) }
                     )
                 }
