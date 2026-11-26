@@ -2,39 +2,34 @@ package app.musique.ui.screens
 
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Album
-import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.NoAccounts
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,25 +40,41 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavKey
+import app.musique.ALBUM_COVER_URL
 import app.musique.R
 import app.musique.ScreenBottomPadding
 import app.musique.core.home.HomeItem
+import app.musique.core.model.CoverSize
+import app.musique.core.model.Track
+import app.musique.core.model.getCover
 import app.musique.data.setting.LocalUiSettings
+import app.musique.ui.GlobalPopupController
+import app.musique.ui.PopupSpec
 import app.musique.ui.components.HomeJamCard
-import app.musique.ui.components.ScreenshotAvatar
-import app.musique.ui.components.SmartImage
+import app.musique.ui.components.SkeletonBox
+import app.musique.ui.components.musique.GroupedTrackList
+import app.musique.ui.components.musique.HeroCard
+import app.musique.ui.components.musique.LargeTitleTopBar
+import app.musique.ui.components.musique.PortraitCard
+import app.musique.ui.components.musique.SectionHeader
+import app.musique.ui.components.musique.SquareCard
+import app.musique.ui.components.musique.TopBarAccountActions
+import app.musique.ui.components.musique.rememberCollapseFraction
 import app.musique.ui.components.navigation.Route
 import app.musique.ui.components.rows.SwipeableTrackRowConfigured
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.theme.MusiqueType
 import app.musique.ui.viewmodel.HomeViewModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SharedTransitionScope.HomeScreen(
     backStack: NavBackStack<NavKey>,
@@ -72,7 +83,6 @@ fun SharedTransitionScope.HomeScreen(
     onShowJam: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
-    val username by viewModel.username.collectAsState()
     val avatar by viewModel.userImageUrl.collectAsState()
     val loggedIn by viewModel.isPlaybackLoggedIn.collectAsState()
     val current by viewModel.currentAudio.collectAsState()
@@ -81,6 +91,12 @@ fun SharedTransitionScope.HomeScreen(
     val metadata by viewModel.trackMetadata.collectAsState()
     val likedIds by viewModel.likedIds.collectAsState()
     val tracks = metadata.takeIf { it.lease == state.lease }?.tracks.orEmpty()
+
+    val listState = rememberLazyListState()
+    val collapseFraction = rememberCollapseFraction(listState)
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val screenshotMode = LocalUiSettings.current.screenshotMode
+
     val open: (HomeItem) -> Unit = { item ->
         if (viewModel.isCurrent(state.lease)) {
             val route = when (item.kind) {
@@ -93,8 +109,9 @@ fun SharedTransitionScope.HomeScreen(
         }
     }
     val play: (HomeItem) -> Unit = { viewModel.play(it, state.lease) }
+
     val trackRow: @Composable (HomeItem) -> Unit = { item ->
-        val track = tracks[item.uri]
+        val track = tracks[item.uri] ?: item.track
         SwipeableTrackRowConfigured(
             track = track,
             currentAudio = current,
@@ -112,203 +129,478 @@ fun SharedTransitionScope.HomeScreen(
         )
     }
 
-    Scaffold(modifier = modifier) { padding ->
+    val usePickedAsTopPortrait = state.pickedAlbums.isNotEmpty()
+    val topSectionFromSections = if (!usePickedAsTopPortrait) state.sections.firstOrNull() else null
+    val remainingSections = if (usePickedAsTopPortrait) state.sections else state.sections.drop(1)
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MusiqueColors.canvas)
+    ) {
         PullToRefreshBox(
             isRefreshing = state.refreshing && state.hasContent,
             onRefresh = viewModel::refresh,
-            modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
+            modifier = Modifier.fillMaxSize(),
         ) {
-            LazyColumn(contentPadding = PaddingValues(bottom = ScreenBottomPadding + 24.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.fillMaxSize()) {
-                item(key = "header") {
-                    HomeHeader(username, avatar, { backStack.add(Route.SettingsScreen) }, { backStack.add(Route.SettingsScreen) })
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(
+                    top = statusBarTop + MusiqueDimens.topBarHeight + 8.dp,
+                    bottom = ScreenBottomPadding + 24.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(MusiqueDimens.sectionSpacing),
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (jam != null) {
+                    item(key = "jam_active") {
+                        HomeJamCard(
+                            jam = jam,
+                            onClick = onShowJam,
+                            modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding),
+                        )
+                    }
                 }
-                item(key = "jam") {
-                    HomeJamCard(jam = jam, onClick = onShowJam, modifier = Modifier.padding(horizontal = 24.dp))
-                }
+
                 when {
                     state.lease == null -> item(key = "login") {
                         HomeMessage(
                             title = stringResource(if (loggedIn) R.string.home_connecting else R.string.connect_to_spotify),
-                            message = stringResource(if (loggedIn) R.string.home_connecting_description else R.string.home_playback_login_description),
+                            message = stringResource(
+                                if (loggedIn) R.string.home_connecting_description
+                                else R.string.home_playback_login_description
+                            ),
                             action = stringResource(if (loggedIn) R.string.common_retry else R.string.connect_to_spotify),
                             onClick = { if (loggedIn) viewModel.retry() else backStack.add(Route.SettingsScreen) },
                         )
                     }
+
                     else -> {
-                        if (state.error != null || state.partial) item(key = "warning") {
-                            Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                shape = RoundedCornerShape(16.dp), modifier = Modifier.padding(horizontal = 24.dp)) {
-                                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(stringResource(if (state.hasContent) R.string.home_partial_feed else R.string.home_feed_error),
-                                        modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                    TextButton(onClick = viewModel::refresh) { Text(stringResource(R.string.common_retry)) }
-                                }
-                            }
-                        }
-                        item(key = "quick_title") { SectionTitle(stringResource(R.string.home_quick_picks)) }
-                        if (state.quickPicks.isNotEmpty()) item(key = "quick_picks") {
-                            // Horizontal scrolling would intercept the configured left/right swipe actions.
-                            Column {
-                                state.quickPicks.forEach { item ->
-                                    key(item.uri) {
-                                        if (item.kind == "track") trackRow(item)
-                                        else Box(Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
-                                            QuickPick(item, playing && current?.uri == item.uri, { play(item) }, { open(item) })
+                        if (state.error != null || state.partial) {
+                            item(key = "warning") {
+                                Surface(
+                                    color = MusiqueColors.cardRaised,
+                                    shape = MusiqueShapes.cardLarge,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = MusiqueDimens.screenPadding)
+                                        .border(
+                                            MusiqueDimens.hairlineWidth,
+                                            MusiqueColors.hairline,
+                                            MusiqueShapes.cardLarge,
+                                        ),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = stringResource(
+                                                if (state.hasContent) R.string.home_partial_feed
+                                                else R.string.home_feed_error
+                                            ),
+                                            style = MusiqueType.rowSubtitle,
+                                            color = MusiqueColors.textSecondary,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        TextButton(onClick = viewModel::refresh) {
+                                            Text(
+                                                text = stringResource(R.string.common_retry),
+                                                color = MaterialTheme.colorScheme.primary,
+                                            )
                                         }
                                     }
                                 }
                             }
-                        } else if (state.refreshing) item(key = "quick_loading") {
-                            Column { repeat(3) { SwipeableTrackRowConfigured(track = null) } }
-                        }
-                        else item(key = "quick_empty") {
-                            Text(stringResource(R.string.home_quick_picks_empty), Modifier.padding(horizontal = 24.dp),
-                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
 
-                        if (state.pickedAlbums.isNotEmpty() || state.refreshing) {
-                            item(key = "albums_title") { SectionTitle(stringResource(R.string.home_picked_albums)) }
-                            item(key = "albums") {
-                                if (state.pickedAlbums.isEmpty()) HomeSkeleton()
-                                else HomeShelf(state.pickedAlbums, open, play, trackRow)
+                        // Top Portrait Carousel: Top Picks for You
+                        if (usePickedAsTopPortrait) {
+                            item(key = "top_picks_header") {
+                                SectionHeader(title = stringResource(R.string.home_top_picks))
+                            }
+                            item(key = "top_picks_carousel") {
+                                PortraitCarousel(
+                                    items = state.pickedAlbums,
+                                    tracks = tracks,
+                                    likedIds = likedIds,
+                                    onOpen = open,
+                                    onPlay = play,
+                                )
+                            }
+                        } else if (topSectionFromSections != null) {
+                            item(key = "top_section_header_${topSectionFromSections.id}") {
+                                SectionHeader(title = topSectionFromSections.title)
+                            }
+                            item(key = "top_section_carousel_${topSectionFromSections.id}") {
+                                PortraitCarousel(
+                                    items = topSectionFromSections.items,
+                                    tracks = tracks,
+                                    likedIds = likedIds,
+                                    onOpen = open,
+                                    onPlay = play,
+                                )
+                            }
+                        } else if (state.refreshing) {
+                            item(key = "top_picks_loading_header") {
+                                SectionHeader(title = stringResource(R.string.home_top_picks))
+                            }
+                            item(key = "top_picks_loading") {
+                                PortraitCarouselSkeleton()
                             }
                         }
-                        state.sections.forEach { section ->
-                            item(key = "title-${section.id}") { SectionTitle(section.title) }
-                            item(key = "shelf-${section.id}") { HomeShelf(section.items, open, play, trackRow) }
+
+                        // Recently Played / Quick Picks Hero Carousel
+                        if (state.quickPicks.isNotEmpty()) {
+                            item(key = "quick_picks_header") {
+                                SectionHeader(title = stringResource(R.string.home_recently_played))
+                            }
+                            item(key = "quick_picks_carousel") {
+                                HeroCarousel(
+                                    items = state.quickPicks,
+                                    tracks = tracks,
+                                    likedIds = likedIds,
+                                    onOpen = open,
+                                    onPlay = play,
+                                )
+                            }
+                        } else if (state.refreshing) {
+                            item(key = "quick_picks_loading_header") {
+                                SectionHeader(title = stringResource(R.string.home_recently_played))
+                            }
+                            item(key = "quick_picks_loading") {
+                                HeroCarouselSkeleton()
+                            }
+                        } else if (state.hasContent) {
+                            item(key = "quick_empty") {
+                                Text(
+                                    text = stringResource(R.string.home_quick_picks_empty),
+                                    style = MusiqueType.cardSubtitle,
+                                    color = MusiqueColors.textSecondary,
+                                    modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding),
+                                )
+                            }
                         }
-                        if (!state.hasContent && !state.refreshing && state.error == null) item(key = "empty") {
-                            HomeMessage(stringResource(R.string.home_feed_empty), stringResource(R.string.home_feed_empty_description),
-                                stringResource(R.string.common_retry), viewModel::refresh)
+
+                        if (jam == null) {
+                            item(key = "jam_idle") {
+                                HomeJamCard(
+                                    jam = null,
+                                    onClick = onShowJam,
+                                    modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding),
+                                )
+                            }
                         }
+
+                        // Remaining sections as SquareCard carousels (or GroupedTrackList for track-only items)
+                        remainingSections.forEach { section ->
+                            val (eyebrow, title) = splitSectionTitle(section.title)
+                            val seedImage = if (eyebrow != null) {
+                                section.items.firstOrNull()?.let { resolveHomeArtwork(it, tracks) }
+                            } else null
+
+                            item(key = "section_header_${section.id}") {
+                                SectionHeader(
+                                    title = title,
+                                    eyebrow = eyebrow,
+                                    seedArtworkUrl = seedImage,
+                                )
+                            }
+                            item(key = "section_body_${section.id}") {
+                                HomeSquareSection(
+                                    items = section.items,
+                                    tracks = tracks,
+                                    likedIds = likedIds,
+                                    onOpen = open,
+                                    onPlay = play,
+                                    trackRow = trackRow,
+                                )
+                            }
+                        }
+
+                        if (!state.hasContent && !state.refreshing && state.error == null) {
+                            item(key = "empty") {
+                                HomeMessage(
+                                    title = stringResource(R.string.home_feed_empty),
+                                    message = stringResource(R.string.home_feed_empty_description),
+                                    action = stringResource(R.string.common_retry),
+                                    onClick = viewModel::refresh,
+                                )
+                            }
+                        }
+
                         item(key = "source") {
-                            Text(stringResource(R.string.home_source_description), Modifier.padding(horizontal = 24.dp),
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = stringResource(R.string.home_source_description),
+                                style = MusiqueType.caption,
+                                color = MusiqueColors.textTertiary,
+                                modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding),
+                            )
                         }
                     }
                 }
             }
         }
-    }
-}
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun HomeHeader(username: String?, avatar: String?, onAccount: () -> Unit, onSettings: () -> Unit) {
-    val screenshot = LocalUiSettings.current.screenshotMode
-    val name = if (screenshot) stringResource(R.string.screenshot_mode_username) else username ?: stringResource(R.string.home_user_fallback)
-    Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.welcome_back, name), style = MaterialTheme.typography.headlineLargeEmphasized,
-                fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(stringResource(R.string.home_discovery_subtitle), style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
-        }
-        IconButton(onClick = onAccount) {
-            if (screenshot) ScreenshotAvatar()
-            else if (avatar != null) SmartImage(avatar, Modifier.size(40.dp), shape = CircleShape,
-                contentDescription = stringResource(R.string.common_account))
-            else Icon(Icons.Default.NoAccounts, stringResource(R.string.common_account))
-        }
-        IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, stringResource(R.string.common_settings)) }
+        LargeTitleTopBar(
+            title = stringResource(R.string.home_title),
+            collapseFraction = collapseFraction,
+            trailingContent = {
+                TopBarAccountActions(
+                    avatarUrl = avatar,
+                    screenshotMode = screenshotMode,
+                    onDevicesClick = { GlobalPopupController.show(PopupSpec.PlaybackDevices()) },
+                    onProfileClick = { backStack.add(Route.SettingsScreen) },
+                )
+            },
+        )
     }
 }
 
 @Composable
-private fun SectionTitle(title: String) {
-    Text(title, Modifier.padding(horizontal = 24.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-}
-
-@Composable
-private fun QuickPick(item: HomeItem, playing: Boolean, onPlay: () -> Unit, onOpen: () -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = if (playing) MaterialTheme.colorScheme.secondaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().clickable(onClick = onPlay)) {
-        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            HomeArtwork(item, Modifier.size(60.dp))
-            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                Text(item.subtitle.ifBlank { homeKind(item.kind) }, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            IconButton(onClick = onOpen, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.MoreHoriz, stringResource(R.string.home_open_item, item.title))
-            }
-        }
-    }
-}
-
-@Composable
-private fun HomeShelf(
+private fun PortraitCarousel(
     items: List<HomeItem>,
+    tracks: Map<String, Track>,
+    likedIds: Set<String>,
+    onOpen: (HomeItem) -> Unit,
+    onPlay: (HomeItem) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = MusiqueDimens.screenPadding),
+        horizontalArrangement = Arrangement.spacedBy(MusiqueDimens.cardSpacing),
+    ) {
+        items(items, key = { "portrait_${it.uri}" }) { item ->
+            val resolvedTrack = tracks[item.uri] ?: item.track
+            val imageUrl = resolveHomeArtwork(item, tracks)
+            val eyebrow = if (item.kind == "playlist") {
+                stringResource(R.string.home_eyebrow_made_for_you)
+            } else {
+                homeKind(item.kind)
+            }
+            PortraitCard(
+                title = item.title,
+                eyebrow = eyebrow,
+                subtitle = item.subtitle.ifBlank { null },
+                imageUrl = imageUrl,
+                onClick = { if (item.kind == "track") onPlay(item) else onOpen(item) },
+                onPlayClick = { onPlay(item) },
+                onLongClick = resolvedTrack?.let { t ->
+                    {
+                        GlobalPopupController.show(
+                            PopupSpec.TrackInfo(track = t, isLiked = t.id in likedIds)
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroCarousel(
+    items: List<HomeItem>,
+    tracks: Map<String, Track>,
+    likedIds: Set<String>,
+    onOpen: (HomeItem) -> Unit,
+    onPlay: (HomeItem) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = MusiqueDimens.screenPadding),
+        horizontalArrangement = Arrangement.spacedBy(MusiqueDimens.cardSpacing),
+    ) {
+        items(items, key = { "hero_${it.uri}" }) { item ->
+            val resolvedTrack = tracks[item.uri] ?: item.track
+            val imageUrl = resolveHomeArtwork(item, tracks)
+            val subtitle = item.subtitle.ifBlank {
+                resolvedTrack?.artists?.joinToString(", ") { it.name } ?: homeKind(item.kind)
+            }
+            HeroCard(
+                title = item.title,
+                subtitle = subtitle,
+                imageUrl = imageUrl,
+                onClick = { if (item.kind == "track") onPlay(item) else onOpen(item) },
+                onPlayClick = { onPlay(item) },
+                onLongClick = resolvedTrack?.let { t ->
+                    {
+                        GlobalPopupController.show(
+                            PopupSpec.TrackInfo(track = t, isLiked = t.id in likedIds)
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeSquareSection(
+    items: List<HomeItem>,
+    tracks: Map<String, Track>,
+    likedIds: Set<String>,
     onOpen: (HomeItem) -> Unit,
     onPlay: (HomeItem) -> Unit,
     trackRow: @Composable (HomeItem) -> Unit,
 ) {
-    Column {
-        val cards = items.filter { it.kind != "track" }
-        if (cards.isNotEmpty()) LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(cards, key = { it.uri }) { item ->
-                // Clip artwork only: a rounded clip around the column cuts into its bottom labels.
-                Column(Modifier.width(156.dp).clickable { onOpen(item) }) {
-                    Box {
-                        HomeArtwork(item, Modifier.size(156.dp))
-                        FilledIconButton(onClick = { onPlay(item) }, modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).size(40.dp)) {
-                            Icon(Icons.Default.PlayArrow, stringResource(R.string.home_play_item, item.title))
-                        }
-                    }
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 10.dp)) {
-                        Text(item.title, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.titleSmall)
-                        Text(item.subtitle.ifBlank { homeKind(item.kind) }, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 3.dp))
+    val cards = items.filter { it.kind != "track" }
+    val trackItems = items.filter { it.kind == "track" }
+    // Until track metadata arrives, show tracks as cards from the feed's own fields.
+    val tracksAsCards = cards.isEmpty() && trackItems.all { (tracks[it.uri] ?: it.track) == null }
+    val carouselItems = if (tracksAsCards) trackItems else cards
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (carouselItems.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = MusiqueDimens.screenPadding),
+                horizontalArrangement = Arrangement.spacedBy(MusiqueDimens.cardSpacing),
+            ) {
+                items(carouselItems, key = { "card_${it.uri}" }) { item ->
+                    SquareCard(
+                        title = item.title,
+                        subtitle = item.subtitle.ifBlank { homeKind(item.kind) },
+                        imageUrl = resolveHomeArtwork(item, tracks),
+                        isCircular = item.kind == "artist",
+                        onClick = { if (item.kind == "track") onPlay(item) else onOpen(item) },
+                        onPlayClick = { onPlay(item) },
+                    )
+                }
+            }
+        }
+
+        // Swipeable rows stay vertical: a horizontal carousel would steal their swipe gestures.
+        if (trackItems.isNotEmpty() && !tracksAsCards) {
+            GroupedTrackList(
+                containerColor = MusiqueColors.card,
+                modifier = Modifier.padding(horizontal = MusiqueDimens.screenPadding),
+            ) {
+                trackItems.forEach { item ->
+                    key(item.uri) {
+                        trackRow(item)
                     }
                 }
             }
         }
-        items.filter { it.kind == "track" }.forEach { item -> key(item.uri) { trackRow(item) } }
     }
 }
 
-@Composable
-private fun HomeArtwork(item: HomeItem, modifier: Modifier) {
-    val shape = if (item.kind == "artist") CircleShape else RoundedCornerShape(12.dp)
-    if (item.imageUrl != null) SmartImage(item.imageUrl, modifier, contentDescription = item.title, shape = shape)
-    else Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.Album, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun resolveHomeArtwork(item: HomeItem, tracks: Map<String, Track>): String? {
+    item.imageUrl?.takeIf { it.isNotBlank() }?.let { return it }
+    val track = tracks[item.uri] ?: item.track ?: return null
+    val coverUri = track.album?.getCover(CoverSize.LARGE)?.uri
+        ?: track.album?.getCover(CoverSize.MEDIUM)?.uri
+        ?: track.album?.getCover(CoverSize.SMALL)?.uri
+        ?: return null
+    return ALBUM_COVER_URL + coverUri
+}
+
+private fun splitSectionTitle(rawTitle: String): Pair<String?, String> {
+    val prefixes = listOf("More like ", "Similar to ", "Because you listened to ")
+    for (prefix in prefixes) {
+        if (rawTitle.startsWith(prefix, ignoreCase = true) && rawTitle.length > prefix.length) {
+            return rawTitle.take(prefix.length).trim() to rawTitle.drop(prefix.length).trim()
+        }
     }
+    return null to rawTitle
 }
 
 @Composable
-private fun homeKind(kind: String): String = stringResource(when (kind) {
-    "album" -> R.string.home_kind_album
-    "playlist" -> R.string.home_kind_playlist
-    "artist" -> R.string.home_kind_artist
-    else -> R.string.home_kind_track
-})
+private fun homeKind(kind: String): String = stringResource(
+    when (kind) {
+        "album" -> R.string.home_kind_album
+        "playlist" -> R.string.home_kind_playlist
+        "artist" -> R.string.home_kind_artist
+        else -> R.string.home_kind_track
+    }
+)
 
 @Composable
-private fun HomeSkeleton() {
-    LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        items(4) {
-            Column(Modifier.width(156.dp)) {
-                Surface(Modifier.size(156.dp), shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {}
-                Spacer(Modifier.height(12.dp))
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
+private fun PortraitCarouselSkeleton() {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = MusiqueDimens.screenPadding),
+        horizontalArrangement = Arrangement.spacedBy(MusiqueDimens.cardSpacing),
+    ) {
+        items(3) {
+            SkeletonBox(
+                modifier = Modifier
+                    .width(MusiqueDimens.portraitCardWidth)
+                    .height(MusiqueDimens.portraitCardHeight),
+                shape = MusiqueShapes.cardLarge,
+            )
         }
     }
 }
 
 @Composable
-private fun HomeMessage(title: String, message: String, action: String, onClick: () -> Unit) {
-    Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onClick) { Text(action) }
+private fun HeroCarouselSkeleton() {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = MusiqueDimens.screenPadding),
+        horizontalArrangement = Arrangement.spacedBy(MusiqueDimens.cardSpacing),
+    ) {
+        items(3) {
+            SkeletonBox(
+                modifier = Modifier
+                    .width(MusiqueDimens.heroCardWidth)
+                    .height(MusiqueDimens.heroCardHeight),
+                shape = MusiqueShapes.card,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeMessage(
+    title: String,
+    message: String,
+    action: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = MusiqueShapes.cardLarge,
+        color = MusiqueColors.card,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = MusiqueDimens.screenPadding)
+            .border(MusiqueDimens.hairlineWidth, MusiqueColors.hairline, MusiqueShapes.cardLarge),
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(MusiqueColors.fillOnArtwork, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MusicNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(
+                text = title,
+                style = MusiqueType.sectionTitle,
+                color = MusiqueColors.textPrimary,
+            )
+            Text(
+                text = message,
+                style = MusiqueType.rowSubtitle,
+                color = MusiqueColors.textSecondary,
+            )
+            Button(
+                onClick = onClick,
+                shape = MusiqueShapes.actionButton,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = MusiqueColors.onDarkPlay,
+                ),
+            ) {
+                Text(
+                    text = action,
+                    style = MusiqueType.button,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }
