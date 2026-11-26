@@ -212,6 +212,20 @@ fun TrackInfoBottomSheet(
                 )
                 SheetDivider()
                 SheetActionRow(
+                    label = stringResource(R.string.sheet_share_song_link),
+                    supportingText = stringResource(R.string.sheet_share_song_link_hint),
+                    icon = Icons.Rounded.Public,
+                    onClick = {
+                        // song.link resolves a Spotify id to every streaming service, like the desktop app's share
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            putExtra(Intent.EXTRA_TEXT, "https://song.link/s/${track.id}")
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, null))
+                    }
+                )
+                SheetDivider()
+                SheetActionRow(
                     label = stringResource(R.string.cd_add_to_widget),
                     icon = Icons.Rounded.Widgets,
                     onClick = { onAddToWidget?.invoke() }
