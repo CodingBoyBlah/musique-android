@@ -1,5 +1,31 @@
 package app.musique.ui.screens
 
+import androidx.annotation.StringRes
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.NoAccounts
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import app.musique.core.model.Episode
+import app.musique.core.model.Profile
+import app.musique.ui.components.SmartImage
+import app.musique.ui.components.musique.CapsuleSearchField
+import app.musique.ui.components.musique.CategoryTile
+import app.musique.ui.components.musique.FloatingRoundButton
+import app.musique.ui.components.musique.LargeTitleTopBar
+import app.musique.ui.components.musique.TopBarIconButton
+import app.musique.ui.components.musique.rememberCollapseFraction
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.theme.MusiqueType
+import app.musique.ui.theme.pressScale
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
@@ -132,14 +158,14 @@ fun SharedTransitionScope.SearchScreen(
     val currentTrack by viewModel.currentAudio.collectAsState(initial = null)
     val isPlaybackPlaying by viewModel.isPlaying.collectAsState(initial = false)
     val scope = rememberCoroutineScope()
+    val collapseFraction = rememberCollapseFraction(listState)
 
-    val isScrolled by remember {
+    val showScrollToTop by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 2 ||
                     listState.firstVisibleItemScrollOffset > 100
         }
     }
-    val showScrollToTop = isScrolled
 
     var query by rememberSaveable { mutableStateOf("") }
     var showAdvancedSheet by remember { mutableStateOf(false) }
@@ -171,694 +197,432 @@ fun SharedTransitionScope.SearchScreen(
             showEpisodes
         )
     }
+    // The first real result is promoted to a Top Result card; the rest render as rows below it.
+    val topResult = remember(filteredResults) {
+        filteredResults.firstOrNull { it !is SearchUiModel.SectionHeader && it !is SearchUiModel.SkeletonItem }
+    }
+
+    val setQuery: (String) -> Unit = { newQuery ->
+        query = newQuery
+        viewModel.onQueryChange(newQuery)
+    }
+
+    val openShowForEpisode: (Episode) -> Unit = { episode ->
+        val showUri = episode.showUri
+        if (showUri.isNotBlank()) {
+            backStack.add(Route.ShowScreen(showUri))
+        } else {
+            scope.launch {
+                val details = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val raw = viewModel.spClient.getEpisodeDetails(episode.id)
+                        EpisodeDetails.fromJson(raw)
+                    }.getOrNull()
+                }
+                if (details != null && details.showUri.isNotBlank()) {
+                    backStack.add(Route.ShowScreen(details.showUri))
+                }
+            }
+        }
+    }
+
+    /** One result row. [fromHistory] rows get a remove button and don't re-add themselves to history. */
+    val resultRow: @Composable (SearchUiModel, Boolean, Modifier) -> Unit = { item, fromHistory, rowModifier ->
+        val removeButton: (@Composable () -> Unit)? = if (fromHistory) {
+            {
+                IconButton(onClick = { viewModel.removeFromHistory(item.uri) }) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = stringResource(R.string.cd_remove_from_history),
+                        tint = MusiqueColors.textTertiary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        } else null
+        val recordHistory: () -> Unit = { if (!fromHistory) viewModel.addToHistory(item) }
+
+        when (item) {
+            is SearchUiModel.SectionHeader -> {
+                Text(
+                    text = stringResource(id = item.titleRes),
+                    style = MusiqueType.sectionTitle,
+                    color = MusiqueColors.textPrimary,
+                    modifier = rowModifier.padding(
+                        start = MusiqueDimens.screenPadding,
+                        end = MusiqueDimens.screenPadding,
+                        top = 20.dp,
+                        bottom = 6.dp,
+                    )
+                )
+            }
+
+            is SearchUiModel.SkeletonItem -> SkeletonTrackRow()
+
+            is SearchUiModel.TrackItem -> {
+                val track = item.track
+                val isLiked by produceState(initialValue = false, track.uri) {
+                    viewModel.isLiked(track.toOutifyUri()).collect { value = it }
+                }
+                SwipeableTrackRowConfigured(
+                    track = track,
+                    currentAudio = currentTrack,
+                    isPlaybackPlaying = isPlaybackPlaying,
+                    onRowClick = {
+                        recordHistory()
+                        spirc.load(track.toSpotifyUri()) // TODO: make context be the search screen
+                        // Optimistic UI
+                        viewModel.setAudio(track.toPlayableAudio())
+                    },
+                    onArtistClick = { backStack.add(ArtistScreen(it.uri)) },
+                    onArtworkClick = {
+                        val albumUri = track.album?.uri
+                        if (albumUri != null) {
+                            backStack.add(Route.AlbumScreen(albumUri))
+                        } else {
+                            backStack.add(TrackScreen(track.uri))
+                        }
+                    },
+                    isLiked = isLiked,
+                    trailingContent = removeButton,
+                    modifier = rowModifier,
+                )
+            }
+
+            is SearchUiModel.AlbumItem -> {
+                val album = item.album
+                AlbumRow(
+                    album = album,
+                    artworkUrl = album.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+                    onRowClick = {
+                        recordHistory()
+                        backStack.add(Route.AlbumScreen(album.uri))
+                    },
+                    trailingContent = removeButton,
+                    modifier = rowModifier,
+                )
+            }
+
+            is SearchUiModel.ArtistItem -> {
+                val artist = item.artist
+                ArtistRow(
+                    artist = artist,
+                    artworkUrl = artist.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+                    onRowClick = {
+                        recordHistory()
+                        backStack.add(ArtistScreen(artist.uri))
+                    },
+                    trailingContent = removeButton,
+                    modifier = rowModifier,
+                )
+            }
+
+            is SearchUiModel.PlaylistItem -> {
+                val playlist = item.playlist
+                var artworkUrl by remember(playlist.uri) { mutableStateOf<String?>(null) }
+                val authors by produceState<List<Profile>>(emptyList(), playlist.uri) {
+                    value = viewModel.getAuthors(playlist).take(2)
+                }
+                LaunchedEffect(playlist.uri) {
+                    artworkUrl = viewModel.getArtworkUrl(playlist)
+                }
+                PlaylistRow(
+                    playlist = playlist,
+                    artworkUrl = artworkUrl,
+                    onRowClick = {
+                        recordHistory()
+                        backStack.add(PlaylistScreen(playlist.uri))
+                    },
+                    onRowLongClick = {
+                        GlobalPopupController.show(PopupSpec.PlaylistInfo(playlist, artworkUrl))
+                    },
+                    trailingContent = {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy((-4).dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            authors.forEach { author ->
+                                UserChipAvatar(
+                                    artworkUrl = author.imageUrl,
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clickable { backStack.add(Route.ProfileScreen(author.uri)) },
+                                )
+                            }
+                            removeButton?.invoke()
+                        }
+                    },
+                    contentDescription = playlist.attributes.description,
+                    sharedTransitionScope = this@SearchScreen,
+                    modifier = rowModifier,
+                )
+            }
+
+            is SearchUiModel.EpisodeItem -> {
+                val episode = item.episode
+                val isLiked by produceState(initialValue = false, episode.uri) {
+                    viewModel.isLiked(episode.toOutifyUri()).collect { value = it }
+                }
+                SwipeableEpisodeRowConfigured(
+                    episode = episode,
+                    isPlaybackPlaying = isPlaybackPlaying,
+                    onRowClick = {
+                        spirc.load(episode.toOutifyUri())
+                        viewModel.setAudio(episode.toPlayableAudio())
+                    },
+                    onArtworkClick = { openShowForEpisode(episode) },
+                    onShowNameClick = { openShowForEpisode(episode) },
+                    isLiked = isLiked,
+                    trailingContent = removeButton,
+                    modifier = rowModifier,
+                )
+            }
+
+            is SearchUiModel.ShowItem -> {
+                val show = item.show
+                ShowRow(
+                    show = show,
+                    onRowClick = {
+                        backStack.add(Route.ShowScreen(show.uri))
+                        recordHistory()
+                    },
+                    onRowLongClick = {},
+                    onPublisherClick = {},
+                    trailingContent = removeButton,
+                    modifier = rowModifier,
+                )
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .systemBarsPadding()
+            .background(MusiqueColors.canvas)
     ) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 120.dp)
-        ) {
-            if (!showSearchUi) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 24.dp, end = 24.dp, top = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = {
-                            backStack.popKeepingRoot()
-                        }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-                        }
-
-                        Text(
-                            text = stringResource(R.string.search_recommendations),
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-
-                if (isLoading) {
-                    item {
-                        repeat(5) {
-                            SkeletonTrackRow()
-                        }
-                    }
-                } else {
-                    items(
-                        items = results,
-                        key = { it.uri }
-                    ) { item ->
-                        when (item) {
-                            is SearchUiModel.TrackItem -> {
-                                val track = item.track
-                                val isLiked by produceState(initialValue = false, track.uri) {
-                                    viewModel.isLiked(track.toOutifyUri()).collect { value = it }
-                                }
-
-                                SwipeableTrackRowConfigured(
-                                    track = track,
-                                    currentAudio = currentTrack,
-                                    isPlaybackPlaying = isPlaybackPlaying,
-                                    onRowClick = remember(track.uri) {
-                                        {
-                                            spirc.load(track.toSpotifyUri())
-                                            viewModel.setAudio(track.toPlayableAudio())
-                                        }
-                                    },
-                                    onArtistClick = {
-                                        backStack.add(ArtistScreen(it.uri))
-                                    },
-                                    onArtworkClick = {
-                                        val albumUri = track.album?.uri
-                                        if (albumUri != null) {
-                                            backStack.add(Route.AlbumScreen(albumUri))
-                                        } else {
-                                            backStack.add(TrackScreen(track.uri))
-                                        }
-                                    },
-                                    isLiked = isLiked,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            else -> {}
-                        }
-                    }
-                }
-            }
+        Column(Modifier.fillMaxSize()) {
+            LargeTitleTopBar(
+                title = stringResource(if (showSearchUi) R.string.search else R.string.search_recommendations),
+                collapseFraction = collapseFraction,
+                onBack = if (showSearchUi) null else ({ backStack.popKeepingRoot() }),
+                barColor = MusiqueColors.canvas,
+            )
 
             if (showSearchUi) {
-                item {
-                    Text(
-                        text = stringResource(R.string.search),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .padding(start = 24.dp, end = 24.dp, top = 16.dp),
+                // Stays pinned under the title while results scroll, like Apple Music.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = MusiqueDimens.screenPadding, end = 8.dp, top = 4.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    CapsuleSearchField(
+                        query = query,
+                        onQueryChange = setQuery,
+                        isLoading = isLoading,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TopBarIconButton(
+                        icon = Icons.Rounded.Tune,
+                        contentDescription = stringResource(R.string.cd_advanced_search),
+                        onClick = { showAdvancedSheet = true },
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
-
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        MaterialSearchBar(
-                            query = query,
-                            onQueryChange = { newQuery ->
-                                query = newQuery
-                                viewModel.onQueryChange(newQuery)
-                            },
-                            isLoading = isLoading,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { showAdvancedSheet = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = stringResource(R.string.cd_advanced_search),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
+                if (query.isNotBlank()) {
+                    FiltersBar(
+                        showTracks = showTracks,
+                        showArtists = showArtists,
+                        showAlbums = showAlbums,
+                        showPlaylists = showPlaylists,
+                        showShows = showShows,
+                        showEpisodes = showEpisodes,
+                        onToggleTracks = { showTracks = it },
+                        onToggleArtists = { showArtists = it },
+                        onToggleAlbums = { showAlbums = it },
+                        onTogglePlaylists = { showPlaylists = it },
+                        onToggleShows = { showShows = it },
+                        onToggleEpisodes = { showEpisodes = it }
+                    )
                 }
             }
 
-            if (showSearchUi) {
-                if (query.isBlank() && searchHistory.isEmpty()) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 400.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(72.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = stringResource(R.string.search_no_history_yet),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = stringResource(R.string.search_top_to_save),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = ScreenBottomPadding + 16.dp)
+            ) {
+                if (!showSearchUi) {
+                    if (isLoading) {
+                        item(key = "rec_loading") {
+                            Column { repeat(5) { SkeletonTrackRow() } }
+                        }
+                    } else {
+                        items(items = results, key = { it.uri }) { item ->
+                            if (item is SearchUiModel.TrackItem) {
+                                resultRow(item, false, Modifier.animateItem())
                             }
                         }
                     }
                 } else if (query.isBlank()) {
-                    item {
+                    if (searchHistory.isNotEmpty()) {
+                        item(key = "recent_header") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = MusiqueDimens.screenPadding, end = 4.dp, top = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.search_recent),
+                                    style = MusiqueType.sectionTitle,
+                                    color = MusiqueColors.textPrimary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(onClick = { viewModel.clearHistory() }) {
+                                    Text(
+                                        text = stringResource(R.string.clear_all),
+                                        style = MusiqueType.button,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        }
+                        items(items = historyResults, key = { "history_${it.uri}" }) { item ->
+                            resultRow(item, true, Modifier.animateItem())
+                        }
+                    }
+
+                    item(key = "browse_header") {
+                        Text(
+                            text = stringResource(R.string.search_browse_categories),
+                            style = MusiqueType.sectionTitle,
+                            color = MusiqueColors.textPrimary,
+                            modifier = Modifier.padding(
+                                start = MusiqueDimens.screenPadding,
+                                end = MusiqueDimens.screenPadding,
+                                top = if (searchHistory.isNotEmpty()) 28.dp else 8.dp,
+                                bottom = 12.dp,
+                            ),
+                        )
+                    }
+                    items(BrowseCategories.chunked(2), key = { row -> "browse_${row.first().label}" }) { row ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(horizontal = MusiqueDimens.screenPadding)
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            Text(
-                                text = stringResource(R.string.search_history),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            TextButton(onClick = { viewModel.clearHistory() }) {
-                                Text(stringResource(R.string.clear_all))
+                            row.forEach { category ->
+                                val label = stringResource(category.label)
+                                CategoryTile(
+                                    title = label,
+                                    gradientColors = category.colors,
+                                    onClick = { setQuery(label) },
+                                    modifier = Modifier.weight(1f),
+                                )
                             }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
-
-                    items(
-                        items = historyResults,
-                        key = { it.uri }
-                    ) { item ->
-                        val removeButton: @Composable () -> Unit = {
-                            IconButton(onClick = { viewModel.removeFromHistory(item.uri) }) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = stringResource(R.string.cd_remove_from_history),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        when (item) {
-                            is SearchUiModel.TrackItem -> {
-                                val track = item.track
-                                val isLiked by produceState(initialValue = false, track.uri) {
-                                    viewModel.isLiked(track.toOutifyUri()).collect { value = it }
-                                }
-
-                                SwipeableTrackRowConfigured(
-                                    track = track,
-                                    currentAudio = currentTrack,
-                                    isPlaybackPlaying = isPlaybackPlaying,
-                                    onRowClick = {
-                                        spirc.load(track.toSpotifyUri())
-                                        viewModel.setAudio(track.toPlayableAudio())
-                                    },
-                                    onArtistClick = {
-                                        backStack.add(ArtistScreen(it.uri))
-                                    },
-                                    onArtworkClick = {
-                                        val track = item.track
-                                        val albumUri = track.album?.uri
-                                        if (albumUri != null) {
-                                            backStack.add(Route.AlbumScreen(albumUri))
-                                        } else {
-                                            backStack.add(TrackScreen(track.uri))
-                                        }
-                                    },
-                                    isLiked = isLiked,
-                                    trailingContent = removeButton,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.AlbumItem -> {
-                                val album = item.album
-                                val artworkUrl =
-                                    ALBUM_COVER_URL + album.getCover(CoverSize.MEDIUM)?.uri
-                                AlbumRow(
-                                    album = album,
-                                    artworkUrl = artworkUrl,
-                                    onRowClick = {
-                                        backStack.add(Route.AlbumScreen(album.uri))
-                                    },
-                                    trailingContent = removeButton,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.ArtistItem -> {
-                                val artist = item.artist
-                                ArtistRow(
-                                    artist = artist,
-                                    artworkUrl = ALBUM_COVER_URL + artist.getCover(CoverSize.MEDIUM)?.uri,
-                                    onRowClick = {
-                                        backStack.add(ArtistScreen(artist.uri))
-                                    },
-                                    trailingContent = removeButton,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.PlaylistItem -> {
-                                val playlist = item.playlist
-                                var artworkUrl by remember(playlist.uri) {
-                                    mutableStateOf<String?>(
-                                        null
-                                    )
-                                }
-
-                                val authors by produceState<List<app.musique.core.model.Profile>>(
-                                    emptyList(),
-                                    playlist.uri
-                                ) { value = viewModel.getAuthors(playlist).take(2) }
-
-                                LaunchedEffect(playlist.uri) {
-                                    artworkUrl = viewModel.getArtworkUrl(playlist)
-                                }
-                                PlaylistRow(
-                                    playlist = playlist,
-                                    artworkUrl = artworkUrl,
-                                    onRowClick = {
-                                        backStack.add(PlaylistScreen(playlist.uri))
-                                    },
-                                    onRowLongClick = {
-                                        GlobalPopupController.show(
-                                            PopupSpec.PlaylistInfo(
-                                                playlist,
-                                                artworkUrl
-                                            )
-                                        )
-                                    },
-                                    contentDescription = playlist.attributes.description,
-                                    sharedTransitionScope = this@SearchScreen,
-                                    trailingContent = {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy((-4).dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            authors.forEach { author ->
-                                                UserChipAvatar(
-                                                    artworkUrl = author.imageUrl,
-                                                    modifier = Modifier
-                                                        .size(24.dp)
-                                                        .clickable {
-                                                            backStack.add(
-                                                                Route.ProfileScreen(
-                                                                    author.uri
-                                                                )
-                                                            )
-                                                        },
-                                                )
-                                            }
-
-                                            removeButton()
-                                        }
-
-                                    },
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.EpisodeItem -> {
-                                val episode = item.episode
-                                val showUri = episode.showUri
-                                val openShow: () -> Unit = {
-                                    if (showUri.isNotBlank()) {
-                                        backStack.add(Route.ShowScreen(showUri))
-                                    } else {
-                                        scope.launch {
-                                            val details = withContext(Dispatchers.IO) {
-                                                runCatching {
-                                                    val raw =
-                                                        viewModel.spClient.getEpisodeDetails(episode.id)
-                                                    EpisodeDetails.fromJson(raw)
-                                                }.getOrNull()
-                                            }
-                                            if (details != null && details.showUri.isNotBlank()) {
-                                                backStack.add(Route.ShowScreen(details.showUri))
-                                            }
-                                        }
-                                    }
-                                }
-
-                                val isLiked by produceState(initialValue = false, episode.uri) {
-                                    viewModel.isLiked(episode.toOutifyUri()).collect { value = it }
-                                }
-
-                                SwipeableEpisodeRowConfigured(
-                                    episode = episode,
-                                    isPlaybackPlaying = isPlaybackPlaying,
-                                    onRowClick = {
-                                        spirc.load(episode.toOutifyUri())
-                                        viewModel.setAudio(episode.toPlayableAudio())
-                                    },
-                                    onArtworkClick = openShow,
-                                    onShowNameClick = openShow,
-                                    isLiked = isLiked,
-                                    trailingContent = removeButton,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.ShowItem -> {
-                                val show = item.show
-                                ShowRow(
-                                    show = show,
-                                    onRowClick = {
-                                        backStack.add(Route.ShowScreen(show.uri))
-                                    },
-                                    onRowLongClick = {},
-                                    onPublisherClick = {},
-                                    trailingContent = removeButton,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            else -> {}
-                        }
-                    }
-                }
-
-                if (query.isNotBlank()) {
-                    item {
-                        FiltersBar(
-                            showTracks = showTracks,
-                            showArtists = showArtists,
-                            showAlbums = showAlbums,
-                            showPlaylists = showPlaylists,
-                            showShows = showShows,
-                            showEpisodes = showEpisodes,
-                            onToggleTracks = { showTracks = it },
-                            onToggleArtists = { showArtists = it },
-                            onToggleAlbums = { showAlbums = it },
-                            onTogglePlaylists = { showPlaylists = it },
-                            onToggleShows = { showShows = it },
-                            onToggleEpisodes = { showEpisodes = it }
+                } else if (!isLoggedIn) {
+                    item(key = "logged_out") {
+                        SearchMessage(
+                            icon = Icons.Rounded.NoAccounts,
+                            title = stringResource(R.string.login_required),
+                            action = stringResource(R.string.connect_to_spotify),
+                            onAction = { backStack.add(Route.SettingsScreen) },
                         )
                     }
-
-                    if (!isLoggedIn) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.NoAccounts,
-                                        contentDescription = stringResource(R.string.cd_logged_out),
-                                        modifier = Modifier.size(64.dp)
-                                    )
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    Text(
-                                        text = stringResource(R.string.login_required),
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.Login,
-                                        contentDescription = null,
-                                        modifier = Modifier
-                                            .clickable {
-                                                backStack.add(Route.SettingsScreen)
-                                            }
-                                    )
-                                }
-                            }
+                } else if (filteredResults.isEmpty()) {
+                    item(key = "no_results") {
+                        SearchMessage(
+                            icon = Icons.Rounded.SearchOff,
+                            title = stringResource(R.string.search_no_results),
+                            message = stringResource(R.string.search_type_query_select_filters),
+                        )
+                    }
+                } else {
+                    topResult?.let { top ->
+                        item(key = "top_result_header") {
+                            Text(
+                                text = stringResource(R.string.search_top_result),
+                                style = MusiqueType.sectionTitle,
+                                color = MusiqueColors.textPrimary,
+                                modifier = Modifier.padding(
+                                    start = MusiqueDimens.screenPadding,
+                                    end = MusiqueDimens.screenPadding,
+                                    top = 8.dp,
+                                    bottom = 10.dp,
+                                ),
+                            )
                         }
-                    } else if (filteredResults.isEmpty()) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SearchOff,
-                                        contentDescription = stringResource(R.string.cd_select_filters),
-                                        modifier = Modifier.size(64.dp)
-                                    )
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    Text(
-                                        text = stringResource(R.string.search_no_results),
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-
-                                    Text(
-                                        text = stringResource(R.string.search_type_query_select_filters),
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                }
-                            }
+                        item(key = "top_result_${top.uri}") {
+                            TopResultCard(
+                                item = top,
+                                viewModel = viewModel,
+                                onOpen = {
+                                    viewModel.addToHistory(top)
+                                    when (top) {
+                                        is SearchUiModel.TrackItem -> {
+                                            spirc.load(top.track.toSpotifyUri())
+                                            viewModel.setAudio(top.track.toPlayableAudio())
+                                        }
+                                        is SearchUiModel.AlbumItem -> backStack.add(Route.AlbumScreen(top.album.uri))
+                                        is SearchUiModel.ArtistItem -> backStack.add(ArtistScreen(top.artist.uri))
+                                        is SearchUiModel.PlaylistItem -> backStack.add(PlaylistScreen(top.playlist.uri))
+                                        is SearchUiModel.ShowItem -> backStack.add(Route.ShowScreen(top.show.uri))
+                                        is SearchUiModel.EpisodeItem -> openShowForEpisode(top.episode)
+                                        else -> {}
+                                    }
+                                },
+                                onPlay = {
+                                    viewModel.addToHistory(top)
+                                    when (top) {
+                                        is SearchUiModel.TrackItem -> {
+                                            spirc.load(top.track.toSpotifyUri())
+                                            viewModel.setAudio(top.track.toPlayableAudio())
+                                        }
+                                        is SearchUiModel.AlbumItem -> spirc.load(top.album.toSpotifyUri())
+                                        is SearchUiModel.PlaylistItem -> spirc.load(top.playlist.toSpotifyUri())
+                                        is SearchUiModel.EpisodeItem -> {
+                                            spirc.load(top.episode.toOutifyUri())
+                                            viewModel.setAudio(top.episode.toPlayableAudio())
+                                        }
+                                        is SearchUiModel.ArtistItem -> backStack.add(ArtistScreen(top.artist.uri))
+                                        is SearchUiModel.ShowItem -> backStack.add(Route.ShowScreen(top.show.uri))
+                                        else -> {}
+                                    }
+                                },
+                            )
                         }
                     }
 
                     items(
-                        items = filteredResults,
+                        items = filteredResults.filter { it.uri != topResult?.uri },
                         key = { it.uri }
                     ) { item ->
-                        when (item) {
-                            is SearchUiModel.SectionHeader -> {
-                                Text(
-                                    text = stringResource(id = item.titleRes),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.padding(
-                                        horizontal = 16.dp,
-                                        vertical = 8.dp
-                                    )
-                                )
-                            }
-
-                            is SearchUiModel.SkeletonItem -> {
-                                SkeletonTrackRow()
-                            }
-
-                            is SearchUiModel.TrackItem -> {
-                                val track = item.track
-                                val isLiked by produceState(initialValue = false, track.uri) {
-                                    viewModel.isLiked(track.toOutifyUri()).collect { value = it }
-                                }
-
-                                SwipeableTrackRowConfigured(
-                                    track = track,
-                                    currentAudio = currentTrack,
-                                    isPlaybackPlaying = isPlaybackPlaying,
-                                    onRowClick = remember(track.uri) {
-                                        {
-                                            viewModel.addToHistory(item)
-                                            spirc.load(track.toSpotifyUri()) // TODO: make context be the search screen
-                                            // Optimistic UI
-                                            viewModel.setAudio(track.toPlayableAudio())
-                                        }
-                                    },
-                                    onArtistClick = {
-                                        backStack.add(ArtistScreen(it.uri))
-                                    },
-                                    onArtworkClick = {
-                                        val track = item.track
-                                        val albumUri = track.album?.uri
-                                        if (albumUri != null) {
-                                            backStack.add(Route.AlbumScreen(albumUri))
-                                        } else {
-                                            backStack.add(TrackScreen(track.uri))
-                                        }
-                                    },
-                                    isLiked = isLiked,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.AlbumItem -> {
-                                val album = item.album
-                                val artworkUrl =
-                                    ALBUM_COVER_URL + album.getCover(CoverSize.MEDIUM)?.uri;
-
-                                AlbumRow(
-                                    album = album,
-                                    artworkUrl = artworkUrl,
-                                    onRowClick = {
-                                        viewModel.addToHistory(item)
-                                        backStack.add(Route.AlbumScreen(album.uri))
-                                    },
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.ArtistItem -> {
-                                val artist = item.artist
-
-                                ArtistRow(
-                                    artist = artist,
-                                    artworkUrl = ALBUM_COVER_URL + artist.getCover(CoverSize.MEDIUM)?.uri,
-                                    onRowClick = {
-                                        viewModel.addToHistory(item)
-                                        backStack.add(ArtistScreen(artist.uri))
-                                    },
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.PlaylistItem -> {
-                                val playlist = item.playlist
-                                var artworkUrl by remember(playlist.uri) {
-                                    mutableStateOf<String?>(
-                                        null
-                                    )
-                                }
-
-                                val authors by produceState<List<app.musique.core.model.Profile>>(
-                                    emptyList(),
-                                    playlist.uri
-                                ) { value = viewModel.getAuthors(playlist).take(2) }
-
-                                LaunchedEffect(playlist.uri) {
-                                    artworkUrl = viewModel.getArtworkUrl(playlist)
-                                }
-
-                                PlaylistRow(
-                                    playlist = playlist,
-                                    artworkUrl = artworkUrl,
-                                    onRowClick = {
-                                        viewModel.addToHistory(item)
-                                        backStack.add(PlaylistScreen(playlist.uri))
-                                    },
-                                    onRowLongClick = {
-                                        GlobalPopupController.show(
-                                            PopupSpec.PlaylistInfo(
-                                                playlist,
-                                                artworkUrl
-                                            )
-                                        )
-                                    },
-                                    trailingContent = {
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy((-4).dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            authors.forEach { author ->
-                                                UserChipAvatar(
-                                                    artworkUrl = author.imageUrl,
-                                                    modifier = Modifier
-                                                        .size(24.dp)
-                                                        .clickable {
-                                                            backStack.add(
-                                                                Route.ProfileScreen(
-                                                                    author.uri
-                                                                )
-                                                            )
-                                                        },
-                                                )
-                                            }
-                                        }
-
-                                    },
-                                    contentDescription = playlist.attributes.description,
-                                    sharedTransitionScope = this@SearchScreen,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.EpisodeItem -> {
-                                val episode = item.episode
-                                val showUri = episode.showUri
-                                val openShow: () -> Unit = {
-                                    if (showUri.isNotBlank()) {
-                                        backStack.add(Route.ShowScreen(showUri))
-                                    } else {
-                                        scope.launch {
-                                            val details = withContext(Dispatchers.IO) {
-                                                runCatching {
-                                                    val raw =
-                                                        viewModel.spClient.getEpisodeDetails(episode.id)
-                                                    EpisodeDetails.fromJson(raw)
-                                                }.getOrNull()
-                                            }
-                                            if (details != null && details.showUri.isNotBlank()) {
-                                                backStack.add(Route.ShowScreen(details.showUri))
-                                            }
-                                        }
-                                    }
-                                }
-                                val isLiked by produceState(initialValue = false, episode.uri) {
-                                    viewModel.isLiked(episode.toOutifyUri()).collect { value = it }
-                                }
-
-                                SwipeableEpisodeRowConfigured(
-                                    episode = episode,
-                                    isPlaybackPlaying = isPlaybackPlaying,
-                                    onRowClick = {
-                                        spirc.load(episode.toOutifyUri())
-                                        viewModel.setAudio(episode.toPlayableAudio())
-                                    },
-                                    onArtworkClick = openShow,
-                                    onShowNameClick = openShow,
-                                    isLiked = isLiked,
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-
-                            is SearchUiModel.ShowItem -> {
-                                val show = item.show
-                                ShowRow(
-                                    show = show,
-                                    onRowClick = {
-                                        backStack.add(Route.ShowScreen(show.uri))
-                                        viewModel.addToHistory(item)
-                                    },
-                                    onPublisherClick = {},
-                                    modifier = Modifier.animateItem()
-                                )
-                            }
-                        }
+                        resultRow(item, false, Modifier.animateItem())
                     }
                 }
-            }
-
-            item {
-                Spacer(Modifier.height(ScreenBottomPadding))
             }
         }
 
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.BottomEnd
+        AnimatedVisibility(
+            visible = showScrollToTop,
+            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+            exit = fadeOut() + slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = fabBottomPadding(currentTrack != null)),
         ) {
-            AnimatedVisibility(
-                visible = showScrollToTop,
-                enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-                exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
+            FloatingRoundButton(
+                onClick = { scope.launch { listState.scrollToItem(0) } },
+                contentDescription = stringResource(R.string.common_scroll_to_top),
             ) {
-                FloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            listState.scrollToItem(0)
-                        }
-                    },
-                    shape = CircleShape,
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier
-                        .padding(end = 16.dp, bottom = fabBottomPadding(currentTrack != null))
-                        .size(40.dp)
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowUp,
-                        contentDescription = stringResource(R.string.common_scroll_to_top)
-                    )
-                }
+                Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null, modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -870,12 +634,169 @@ fun SharedTransitionScope.SearchScreen(
         ) {
             AdvancedSearchContent(
                 onSearch = { advancedQuery ->
-                    query = advancedQuery
-                    viewModel.onQueryChange(advancedQuery)
+                    setQuery(advancedQuery)
                     showAdvancedSheet = false
                 },
                 onDismiss = { showAdvancedSheet = false }
             )
+        }
+    }
+}
+
+private data class BrowseCategory(@StringRes val label: Int, val colors: List<Color>)
+
+/** Idle-state genre tiles; tapping one searches for it. */
+private val BrowseCategories = listOf(
+    BrowseCategory(R.string.search_cat_chill, listOf(Color(0xFF2E7D8C), Color(0xFF15414D))),
+    BrowseCategory(R.string.search_cat_focus, listOf(Color(0xFF5B5FC7), Color(0xFF2A2C6B))),
+    BrowseCategory(R.string.search_cat_workout, listOf(Color(0xFFE5533D), Color(0xFF7A1F16))),
+    BrowseCategory(R.string.search_cat_indie, listOf(Color(0xFFB0832F), Color(0xFF5A3F10))),
+    BrowseCategory(R.string.search_cat_hiphop, listOf(Color(0xFF8E44AD), Color(0xFF3F1752))),
+    BrowseCategory(R.string.search_cat_pop, listOf(Color(0xFFFA2F78), Color(0xFF7D0F38))),
+    BrowseCategory(R.string.search_cat_electronic, listOf(Color(0xFF1E88E5), Color(0xFF0B3A66))),
+    BrowseCategory(R.string.search_cat_rock, listOf(Color(0xFF6D6D6D), Color(0xFF242424))),
+    BrowseCategory(R.string.search_cat_jazz, listOf(Color(0xFFC77D3A), Color(0xFF5C3110))),
+    BrowseCategory(R.string.search_cat_late_night, listOf(Color(0xFF34417A), Color(0xFF10142E))),
+)
+
+/** Apple Music style Top Result: 68dp artwork, title, kind subtitle and a play button. */
+@Composable
+private fun TopResultCard(
+    item: SearchUiModel,
+    viewModel: SearchViewModel,
+    onOpen: () -> Unit,
+    onPlay: () -> Unit,
+) {
+    var playlistArtwork by remember(item.uri) { mutableStateOf<String?>(null) }
+    if (item is SearchUiModel.PlaylistItem) {
+        LaunchedEffect(item.uri) { playlistArtwork = viewModel.getArtworkUrl(item.playlist) }
+    }
+    val (title, subtitle, artwork) = when (item) {
+        is SearchUiModel.TrackItem -> Triple(
+            item.track.name,
+            stringResource(R.string.search_section_tracks) + " · " + item.track.artists.joinToString(", ") { it.name },
+            item.track.album?.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+        )
+        is SearchUiModel.AlbumItem -> Triple(
+            item.album.name,
+            stringResource(R.string.detail_album_type) + " · " + item.album.artists.joinToString(", ") { it.name },
+            item.album.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+        )
+        is SearchUiModel.ArtistItem -> Triple(
+            item.artist.name,
+            stringResource(R.string.home_kind_artist),
+            item.artist.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+        )
+        is SearchUiModel.PlaylistItem -> Triple(
+            item.playlist.attributes.name,
+            stringResource(R.string.detail_playlist_type),
+            playlistArtwork,
+        )
+        is SearchUiModel.ShowItem -> Triple(
+            item.show.name,
+            item.show.publisher,
+            item.show.getCover(CoverSize.MEDIUM)?.uri?.let { ALBUM_COVER_URL + it },
+        )
+        is SearchUiModel.EpisodeItem -> Triple(item.episode.name, item.episode.showName, null)
+        else -> Triple("", "", null)
+    }
+    val isArtist = item is SearchUiModel.ArtistItem
+    val interaction = remember { MutableInteractionSource() }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = MusiqueDimens.screenPadding)
+            .pressScale(interaction, pressedScale = 0.98f)
+            .clip(MusiqueShapes.card)
+            .background(MusiqueColors.cardRaised)
+            .clickable(interactionSource = interaction, indication = null, onClick = onOpen)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SmartImage(
+            url = artwork,
+            imageSize = 68.dp,
+            shape = if (isArtist) CircleShape else MusiqueShapes.artworkSmall,
+            contentDescription = null,
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MusiqueType.cardTitle.copy(fontSize = 17.sp),
+                color = MusiqueColors.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                style = MusiqueType.cardSubtitle,
+                color = MusiqueColors.textSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        val playInteraction = remember { MutableInteractionSource() }
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .pressScale(playInteraction, pressedScale = 0.9f)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(interactionSource = playInteraction, indication = null, onClick = onPlay),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.PlayArrow,
+                contentDescription = stringResource(R.string.cd_play_item),
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchMessage(
+    icon: ImageVector,
+    title: String,
+    message: String? = null,
+    action: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp, vertical = 56.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MusiqueColors.textTertiary,
+            modifier = Modifier.size(52.dp),
+        )
+        Text(
+            text = title,
+            style = MusiqueType.rowTitle,
+            color = MusiqueColors.textPrimary,
+            textAlign = TextAlign.Center,
+        )
+        if (message != null) {
+            Text(
+                text = message,
+                style = MusiqueType.cardSubtitle,
+                color = MusiqueColors.textSecondary,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (action != null && onAction != null) {
+            TextButton(onClick = onAction) {
+                Text(text = action, style = MusiqueType.button, color = MaterialTheme.colorScheme.primary)
+            }
         }
     }
 }
@@ -967,7 +888,7 @@ fun FiltersBar(
     Row(
         modifier = modifier
             .horizontalScroll(scrollState)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = MusiqueDimens.screenPadding, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(chipSpacing),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1003,11 +924,13 @@ fun FiltersBar(
                         Spacer(modifier = Modifier.width(4.dp))
                     }
                 },
+                border = null,
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    containerColor = MusiqueColors.cardRaised,
+                    labelColor = MusiqueColors.textPrimary,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
                     selectedLabelColor = MaterialTheme.colorScheme.primary,
                     selectedLeadingIconColor = MaterialTheme.colorScheme.primary,
-                    // unselected colors fall back to defaults
                 )
             )
         }
