@@ -26,7 +26,7 @@ ksp {
 
 // Bump these for a release, then push a matching tag (v0.2.0). A tag build takes its version from
 // the tag so the in-app updater always compares against what GitHub Releases publishes.
-val baseVersion = "0.1.0"
+val baseVersion = "0.2.0"
 val tagVersion = System.getenv("GITHUB_REF_NAME")
     ?.takeIf { System.getenv("GITHUB_REF_TYPE") == "tag" && it.startsWith("v") }
     ?.removePrefix("v")
