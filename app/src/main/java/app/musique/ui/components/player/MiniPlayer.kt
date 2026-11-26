@@ -467,7 +467,7 @@ private fun MiniPlayerCard(
 
             Surface(
                 modifier = Modifier
-                    .size(width = 56.dp, height = 44.dp)
+                    .size(44.dp)
                     .pressScale(playInteractionSource)
                     .clickable(
                         enabled = interactive,
