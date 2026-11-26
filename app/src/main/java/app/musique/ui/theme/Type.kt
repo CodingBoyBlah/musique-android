@@ -4,32 +4,44 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import app.musique.R
 
-/** Inter stands in for SF Pro, which Apple Music and Cider are drawn in. */
-val InterFamily = FontFamily(
-    Font(R.font.inter_regular, FontWeight.Normal),
-    Font(R.font.inter_medium, FontWeight.Medium),
-    Font(R.font.inter_semibold, FontWeight.SemiBold),
-    Font(R.font.inter_bold, FontWeight.Bold),
-    Font(R.font.inter_extrabold, FontWeight.ExtraBold),
+/**
+ * Google Sans Flex, the face Cider for Android is set in (OFL, one variable file). Each weight is
+ * an instance of the variable font; rounding stays off so it matches Cider's crisp terminals.
+ */
+private fun sansWeight(weight: Int) = Font(
+    R.font.google_sans_flex,
+    FontWeight(weight),
+    variationSettings = FontVariation.Settings(
+        FontVariation.weight(weight),
+        FontVariation.Setting("ROND", 0f),
+    ),
 )
 
-/** Inter's alternate 1 and open digits read closer to SF; tabular figures keep timers from jittering. */
-private const val InterFeatures = "cv11, ss01"
-private const val InterTabular = "cv11, ss01, tnum"
+val SansFamily = FontFamily(
+    sansWeight(400),
+    sansWeight(500),
+    sansWeight(600),
+    sansWeight(700),
+    sansWeight(800),
+)
 
-private fun inter(
+/** Tabular figures keep timers and durations from jittering. */
+private const val Tabular = "tnum"
+
+private fun sans(
     size: Int,
     weight: FontWeight,
     lineHeight: Int,
     tracking: Double = 0.0,
-    features: String = InterFeatures,
+    features: String? = null,
 ) = TextStyle(
-    fontFamily = InterFamily,
+    fontFamily = SansFamily,
     fontWeight = weight,
     fontSize = size.sp,
     lineHeight = lineHeight.sp,
@@ -39,58 +51,58 @@ private fun inter(
 
 /**
  * The Musique type scale, one style per role. Use these directly in new UI;
- * [musiqueTypography] maps them onto Material roles so existing screens pick up Inter too.
+ * [musiqueTypography] maps them onto Material roles so existing screens pick up Google Sans too.
  */
 object MusiqueType {
     /** Tab page titles: Home, Library, Search. */
-    val largeTitle = inter(32, FontWeight.ExtraBold, 38, -0.025)
+    val largeTitle = sans(34, FontWeight.Bold, 40, -0.01)
     /** Title shown in a collapsed top bar. */
-    val barTitle = inter(18, FontWeight.SemiBold, 22, -0.01)
+    val barTitle = sans(18, FontWeight.SemiBold, 22)
     /** Section headers such as "Recently Played". */
-    val sectionTitle = inter(20, FontWeight.Bold, 25, -0.015)
+    val sectionTitle = sans(20, FontWeight.Medium, 25)
     /** Album, playlist and Now Playing titles. */
-    val heroTitle = inter(24, FontWeight.Bold, 29, -0.02)
+    val heroTitle = sans(24, FontWeight.SemiBold, 30)
     /** Artist page name over the portrait. */
-    val artistName = inter(32, FontWeight.ExtraBold, 38, -0.025)
+    val artistName = sans(34, FontWeight.Bold, 40, -0.01)
     /** Now Playing artist and album subtitles. */
-    val heroSubtitle = inter(17, FontWeight.Medium, 22, -0.01)
+    val heroSubtitle = sans(18, FontWeight.Normal, 23)
     /** Titles on cards and grid tiles. */
-    val cardTitle = inter(15, FontWeight.SemiBold, 20, -0.01)
-    val cardSubtitle = inter(13, FontWeight.Normal, 17)
+    val cardTitle = sans(15, FontWeight.Medium, 20)
+    val cardSubtitle = sans(13, FontWeight.Normal, 17)
     /** Small uppercase label above a card title. */
-    val eyebrow = inter(11, FontWeight.SemiBold, 14, 0.04)
-    val rowTitle = inter(16, FontWeight.Medium, 21, -0.005)
-    val rowSubtitle = inter(14, FontWeight.Normal, 18)
-    val body = inter(15, FontWeight.Normal, 21)
-    val button = inter(15, FontWeight.SemiBold, 20)
-    val navLabel = inter(13, FontWeight.SemiBold, 16)
-    val caption = inter(12, FontWeight.Medium, 16, 0.01)
+    val eyebrow = sans(12, FontWeight.Medium, 15, 0.01)
+    val rowTitle = sans(16, FontWeight.Normal, 21)
+    val rowSubtitle = sans(14, FontWeight.Normal, 18)
+    val body = sans(15, FontWeight.Normal, 21)
+    val button = sans(16, FontWeight.Medium, 20)
+    val navLabel = sans(14, FontWeight.Medium, 17)
+    val caption = sans(12, FontWeight.Medium, 16, 0.01)
     /** Durations, scrubber times, counts. */
-    val timestamp = inter(12, FontWeight.Medium, 16, 0.01, InterTabular)
-    val rowDuration = inter(13, FontWeight.Normal, 17, 0.0, InterTabular)
+    val timestamp = sans(12, FontWeight.Medium, 16, 0.01, Tabular)
+    val rowDuration = sans(13, FontWeight.Normal, 17, 0.0, Tabular)
     /** Synced lyric line. Measure every line at this size so lines never re-wrap when lit. */
-    val lyricLine = inter(30, FontWeight.ExtraBold, 37, -0.022)
-    val lyricBackground = inter(21, FontWeight.Bold, 27, -0.01)
-    val lyricTranslation = inter(14, FontWeight.Medium, 19)
+    val lyricLine = sans(30, FontWeight.Bold, 37, -0.01)
+    val lyricBackground = sans(21, FontWeight.Bold, 27)
+    val lyricTranslation = sans(14, FontWeight.Medium, 19)
     /** Mini player text. */
-    val miniTitle = inter(15, FontWeight.SemiBold, 19, -0.005)
-    val miniSubtitle = inter(13, FontWeight.Normal, 17)
+    val miniTitle = sans(15, FontWeight.Medium, 19)
+    val miniSubtitle = sans(13, FontWeight.Normal, 17)
 }
 
 fun musiqueTypography(): Typography = Typography(
-    displayLarge = inter(52, FontWeight.ExtraBold, 58, -0.03),
-    displayMedium = inter(42, FontWeight.ExtraBold, 48, -0.03),
-    displaySmall = inter(36, FontWeight.ExtraBold, 42, -0.025),
+    displayLarge = sans(52, FontWeight.Bold, 58, -0.02),
+    displayMedium = sans(42, FontWeight.Bold, 48, -0.02),
+    displaySmall = sans(36, FontWeight.Bold, 42, -0.015),
     headlineLarge = MusiqueType.largeTitle,
-    headlineMedium = inter(28, FontWeight.Bold, 34, -0.02),
+    headlineMedium = sans(28, FontWeight.Bold, 34, -0.01),
     headlineSmall = MusiqueType.heroTitle,
     titleLarge = MusiqueType.sectionTitle,
-    titleMedium = inter(17, FontWeight.SemiBold, 22, -0.01),
+    titleMedium = sans(17, FontWeight.Medium, 22),
     titleSmall = MusiqueType.cardTitle,
     bodyLarge = MusiqueType.rowTitle.copy(fontWeight = FontWeight.Normal),
     bodyMedium = MusiqueType.rowSubtitle,
     bodySmall = MusiqueType.cardSubtitle,
     labelLarge = MusiqueType.button,
     labelMedium = MusiqueType.caption,
-    labelSmall = inter(11, FontWeight.Medium, 14, 0.02),
+    labelSmall = sans(11, FontWeight.Medium, 14, 0.02),
 )
