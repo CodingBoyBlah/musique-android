@@ -99,6 +99,7 @@ struct SessionData {
 
 struct SessionInternal {
     config: SessionConfig,
+    instance_id: String,
     data: RwLock<SessionData>,
 
     http_client: HttpClient,
@@ -134,6 +135,14 @@ pub struct Session(Arc<SessionInternal>);
 
 impl Session {
     pub fn new(config: SessionConfig, cache: Option<Cache>) -> Self {
+        Self::with_handle(config, cache, tokio::runtime::Handle::current())
+    }
+
+    pub fn with_handle(
+        config: SessionConfig,
+        cache: Option<Cache>,
+        handle: tokio::runtime::Handle,
+    ) -> Self {
         let http_client = HttpClient::new(config.proxy.as_ref());
 
         debug!("new Session");
@@ -149,44 +158,7 @@ impl Session {
 
         Self(Arc::new(SessionInternal {
             config,
-            data: RwLock::new(session_data),
-            http_client,
-            tx_connection: OnceLock::new(),
-            cache: cache.map(Arc::new),
-            apresolver: OnceLock::new(),
-            audio_key: OnceLock::new(),
-            channel: OnceLock::new(),
-            mercury: OnceLock::new(),
-            dealer: OnceLock::new(),
-            spclient: OnceLock::new(),
-            token_provider: OnceLock::new(),
-            login5: OnceLock::new(),
-            handle: tokio::runtime::Handle::current(),
-
-            shutdown_tx,
-        }))
-    }
-
-    pub fn with_handle(
-        config: SessionConfig,
-        cache: Option<Cache>,
-        handle: tokio::runtime::Handle,
-    ) -> Self {
-        let http_client = HttpClient::new(config.proxy.as_ref());
-
-        debug!("new Session with custom handle");
-
-        let session_data = SessionData {
-            client_id: config.client_id.clone(),
-            // can be any guid, doesn't need to be simple
-            session_id: Uuid::new_v4().as_simple().to_string(),
-            ..SessionData::default()
-        };
-
-        let (shutdown_tx, _) = tokio::sync::watch::channel(());
-
-        Self(Arc::new(SessionInternal {
-            config,
+            instance_id: Uuid::new_v4().as_simple().to_string(),
             data: RwLock::new(session_data),
             http_client,
             tx_connection: OnceLock::new(),
@@ -466,6 +438,10 @@ impl Session {
 
     pub fn device_id(&self) -> &str {
         &self.config().device_id
+    }
+
+    pub fn instance_id(&self) -> &str {
+        &self.0.instance_id
     }
 
     pub fn client_id(&self) -> String {
@@ -1005,5 +981,30 @@ where
         }
 
         Poll::Pending
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn instance_id_is_unique_per_session_and_survives_session_id_changes() {
+        let first = Session::new(Default::default(), None);
+        let cloned = first.clone();
+        let second = Session::with_handle(
+            Default::default(),
+            None,
+            tokio::runtime::Handle::current(),
+        );
+
+        assert!(!first.instance_id().is_empty());
+        assert_eq!(first.instance_id(), cloned.instance_id());
+        assert_ne!(first.instance_id(), second.instance_id());
+
+        let original = first.instance_id().to_owned();
+        first.set_session_id("rotated-session");
+        assert_eq!(first.instance_id(), original);
+        assert_eq!(cloned.instance_id(), original);
     }
 }
