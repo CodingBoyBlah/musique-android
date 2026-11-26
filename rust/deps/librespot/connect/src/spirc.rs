@@ -6,7 +6,7 @@ use crate::{
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
-            protocol::{Command, Message, PayloadValue, Request},
+            protocol::{Command, Message, PayloadValue, Request, TransferOptions},
         },
         session::UserAttributes,
         spclient::TransferRequest,
@@ -17,10 +17,11 @@ use crate::{
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
     },
     protocol::{
-        connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
+        connect::{Cluster, ClusterUpdate, DeviceInfo, LogoutCommand, SetVolumeCommand},
         context::Context,
+        devices::DeviceType,
         explicit_content_pubsub::UserAttributesUpdate,
-        player::ProvidedTrack,
+        player::{PlayerState, ProvidedTrack},
         playlist4_external::PlaylistModificationInfo,
         transfer_state::TransferState,
         user_attributes::UserAttributesMutation,
@@ -33,8 +34,9 @@ use crate::{
 };
 use futures_util::{FutureExt, StreamExt};
 use librespot_protocol::context_page::ContextPage;
-use protobuf::MessageField;
+use protobuf::{Message as _, MessageField};
 use std::{
+    collections::HashMap,
     future::Future,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
@@ -172,11 +174,171 @@ impl RemotePlaybackState {
     }
 }
 
+/// Cached Spotify Connect device roster and active playback state.
+#[derive(Clone, Debug, Default)]
+pub struct ConnectDevices {
+    /// Device ID that currently owns Connect playback, or empty when inactive.
+    pub active_device_id: String,
+    /// Whether the active Connect device is actively playing.
+    pub is_playing: bool,
+    /// Connect devices reported in the cluster, keyed by device ID.
+    pub devices: HashMap<String, DeviceInfo>,
+    /// Dealer connection generation when this snapshot was recorded.
+    pub connection_generation: u64,
+    /// Monotonic counter incremented whenever active device ownership changes.
+    pub ownership_generation: u64,
+    /// Latest cluster player state, if present.
+    pub player_state: Option<PlayerState>,
+}
+
+impl ConnectDevices {
+    /// Returns whether `info` represents a playable, online, non-hidden Connect device.
+    pub fn is_visible(info: &DeviceInfo) -> bool {
+        info.can_play
+            && !info.is_offline
+            && !info.capabilities.hidden
+            && info.device_type.enum_value_or_default() != DeviceType::OBSERVER
+    }
+
+    /// Returns whether transferring playback to `id` is restricted from `local_device_id`.
+    pub fn is_restricted(id: &str, info: &DeviceInfo, local_device_id: &str) -> bool {
+        !info.disallow_transfer_reasons.is_empty()
+            || info.capabilities.connect_disabled
+            || (info.capabilities.restrict_to_local && id != local_device_id)
+    }
+}
+
+struct ClusterRoster {
+    ownership_generation: u64,
+    last_active_device_id: Option<String>,
+    tx: watch::Sender<Option<ConnectDevices>>,
+}
+
+impl ClusterRoster {
+    fn new() -> (Self, watch::Receiver<Option<ConnectDevices>>) {
+        let (tx, rx) = watch::channel(None);
+        (
+            Self {
+                ownership_generation: 0,
+                last_active_device_id: None,
+                tx,
+            },
+            rx,
+        )
+    }
+
+    fn record(&mut self, connection_generation: u64, cluster: Option<&Cluster>) {
+        let next = cluster.map(|cluster| {
+            let active = cluster.active_device_id.as_str();
+            if self.last_active_device_id.as_deref() != Some(active) {
+                self.ownership_generation = self.ownership_generation.wrapping_add(1);
+                self.last_active_device_id = Some(cluster.active_device_id.clone());
+            }
+            let player_state = cluster.player_state.as_ref().cloned();
+            let is_playing = !cluster.active_device_id.is_empty()
+                && player_state
+                    .as_ref()
+                    .is_some_and(|p| p.is_playing && !p.is_paused && !p.is_buffering);
+            ConnectDevices {
+                active_device_id: cluster.active_device_id.clone(),
+                is_playing,
+                devices: cluster.device.clone(),
+                connection_generation,
+                ownership_generation: self.ownership_generation,
+                player_state,
+            }
+        });
+
+        if cluster.is_none() && self.last_active_device_id.take().is_some() {
+            self.ownership_generation = self.ownership_generation.wrapping_add(1);
+        }
+
+        self.tx.send_replace(next);
+    }
+
+    fn borrow(&self) -> Option<ConnectDevices> {
+        self.tx.borrow().clone()
+    }
+}
+
+fn read_connect_devices(
+    rx: &watch::Receiver<Option<ConnectDevices>>,
+    session: &Session,
+) -> Result<ConnectDevices, Error> {
+    if session.is_invalid() {
+        return Err(Error::unavailable("Session is invalid"));
+    }
+    let Some(connection_generation) = session.dealer().connection_generation() else {
+        return Err(Error::unavailable("Connect connection is disconnected"));
+    };
+    rx.has_changed()
+        .map_err(|_| Error::unavailable("Connect task stopped"))?;
+    let guard = rx.borrow();
+    let Some(devices) = guard.as_ref() else {
+        return Err(Error::unavailable("Connect devices are not ready"));
+    };
+    if devices.connection_generation != connection_generation {
+        return Err(Error::unavailable("Connect devices snapshot is stale"));
+    }
+    Ok(devices.clone())
+}
+
 struct TransferGuard(Box<dyn FnOnce(RemotePlaybackState) -> bool + Send>);
 
 impl std::fmt::Debug for TransferGuard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("TransferGuard")
+    }
+}
+
+struct TransferToGuard(Box<dyn FnOnce() -> bool + Send>);
+
+impl std::fmt::Debug for TransferToGuard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("TransferToGuard")
+    }
+}
+
+enum TransferAction {
+    AlreadyActive,
+    Transfer,
+}
+
+async fn execute_transfer_once(
+    session: &Session,
+    connection_generation: u64,
+    target_device_id: &str,
+    guard: TransferToGuard,
+    reply: &oneshot::Sender<Result<(), Error>>,
+) -> Result<(), Error> {
+    let mut shutdown = session.subscribe_shutdown();
+    if session.is_invalid() {
+        return Err(Error::unavailable("Session is invalid"));
+    }
+    let request = TransferRequest {
+        transfer_options: TransferOptions::default(),
+    };
+    let transfer = session.spclient().transfer_once(
+        session.device_id(),
+        target_device_id,
+        Some(&request),
+        || {
+            let current_connection =
+                session.dealer().connection_generation() == Some(connection_generation);
+            if reply.is_closed()
+                || session.is_invalid()
+                || !current_connection
+                || !(guard.0)()
+            {
+                return Err(Error::unavailable("Connect runtime was replaced"));
+            }
+            Ok(())
+        },
+    );
+    tokio::select! {
+        biased;
+        _ = shutdown.changed() => Err(Error::unavailable("Session is invalid")),
+        result = transfer => result.map(|_| ()),
     }
 }
 
@@ -223,6 +385,7 @@ struct SpircTask {
     connect_established: bool,
     connection_generation: u64,
     remote_playback: watch::Sender<Option<RemotePlaybackSnapshot>>,
+    connect_devices: ClusterRoster,
 
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
@@ -286,6 +449,11 @@ enum SpircCommand {
         resume: Option<LoadRequest>,
         reply: oneshot::Sender<Result<bool, Error>>,
     },
+    TransferTo {
+        device_id: String,
+        guard: TransferToGuard,
+        reply: oneshot::Sender<Result<(), Error>>,
+    },
     Load(LoadRequest),
     AddToQueue(SpotifyUri),
     ClearQueue,
@@ -313,6 +481,7 @@ const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
     remote_playback: watch::Receiver<Option<RemotePlaybackSnapshot>>,
+    connect_devices: watch::Receiver<Option<ConnectDevices>>,
     session: Session,
 
     // Added for Outify
@@ -397,6 +566,7 @@ impl Spirc {
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
         let (remote_playback_tx, remote_playback_rx) = watch::channel(None);
+        let (connect_devices_roster, connect_devices_rx) = ClusterRoster::new();
 
         let player_events = player.get_player_event_channel();
 
@@ -412,6 +582,7 @@ impl Spirc {
             connect_established: false,
             connection_generation: 0,
             remote_playback: remote_playback_tx,
+            connect_devices: connect_devices_roster,
 
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
@@ -445,6 +616,7 @@ impl Spirc {
         let spirc = Spirc {
             commands: cmd_tx,
             remote_playback: remote_playback_rx,
+            connect_devices: connect_devices_rx,
             session: task.session.clone(),
             events: events_tx,
             runtime_event_tx,
@@ -629,6 +801,83 @@ impl Spirc {
         Ok(self
             .commands
             .send(SpircCommand::Transfer(transfer_request))?)
+    }
+
+    /// Returns the [`Session`] bound to this Connect handle.
+    pub fn session(&self) -> &Session {
+        &self.session
+    }
+
+    /// Returns the latest cached Connect device roster without performing network requests.
+    pub fn current_connect_devices(&self) -> Result<ConnectDevices, Error> {
+        read_connect_devices(&self.connect_devices, &self.session)
+    }
+
+    /// Waits for and returns the current Spotify Connect device roster.
+    pub async fn connect_devices(&self) -> Result<ConnectDevices, Error> {
+        let mut shutdown = self.session.subscribe_shutdown();
+        if self.session.is_invalid() {
+            return Err(Error::unavailable("Session is invalid"));
+        }
+        let mut state = self.connect_devices.clone();
+        state
+            .has_changed()
+            .map_err(|_| Error::unavailable("Connect task stopped"))?;
+
+        let dealer = self.session.dealer();
+        let wait = state.wait_for(|snapshot| {
+            let Some(live_generation) = dealer.connection_generation() else {
+                return false;
+            };
+            snapshot
+                .as_ref()
+                .is_some_and(|devices| devices.connection_generation == live_generation)
+        });
+
+        tokio::select! {
+            biased;
+            _ = shutdown.changed() => Err(Error::unavailable("Session is invalid")),
+            result = wait => {
+                if self.session.is_invalid() {
+                    return Err(Error::unavailable("Session is invalid"));
+                }
+                let guard = result.map_err(|_| Error::unavailable("Connect task stopped"))?;
+                guard
+                    .clone()
+                    .ok_or_else(|| Error::unavailable("Connect devices are not ready"))
+            }
+        }
+    }
+
+    /// Transfers Connect playback to `device_id` if `guard` still holds before the request is sent.
+    pub async fn transfer_to(
+        &self,
+        device_id: impl Into<String>,
+        guard: impl FnOnce() -> bool + Send + 'static,
+    ) -> Result<(), Error> {
+        let device_id = device_id.into();
+        if device_id.is_empty() {
+            return Err(Error::invalid_argument("Missing target Connect device ID"));
+        }
+        let mut shutdown = self.session.subscribe_shutdown();
+        if self.session.is_invalid() {
+            return Err(Error::unavailable("Session is invalid"));
+        }
+
+        let (reply, result) = oneshot::channel();
+        self.commands
+            .send(SpircCommand::TransferTo {
+                device_id,
+                guard: TransferToGuard(Box::new(guard)),
+                reply,
+            })
+            .map_err(|_| Error::unavailable("Connect task stopped"))?;
+
+        tokio::select! {
+            biased;
+            _ = shutdown.changed() => Err(Error::unavailable("Session is invalid")),
+            res = result => res.map_err(|_| Error::unavailable("Connect task stopped"))?,
+        }
     }
 
     /// Waits for the first Connect snapshot. A closed runtime is not idle playback.
@@ -849,12 +1098,13 @@ impl SpircTask {
             }
         }
 
-        self.remote_playback.send_replace(None);
+        self.record_cluster(None);
         if !self.shutdown && self.connect_state.is_active() {
             warn!("unexpected shutdown");
             if let Err(why) = self.handle_disconnect().await {
                 error!("error during disconnecting: {why}")
             }
+            self.record_cluster(None);
         }
 
         // this should clear the active session id, leaving an empty state
@@ -957,6 +1207,59 @@ impl SpircTask {
         dur.as_millis() as i64 + 1000 * self.session.time_delta()
     }
 
+    async fn drain_cluster_updates(&mut self) -> Result<bool, Error> {
+        while let Some(update) = self.connect_state_update.next().now_or_never() {
+            match update {
+                Some(Ok(update)) => self.handle_cluster_update(update).await?,
+                Some(Err(error)) => {
+                    self.record_cluster(None);
+                    return Err(error);
+                }
+                None => {
+                    self.record_cluster(None);
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    fn validate_transfer_target(
+        &self,
+        device_id: &str,
+        connection_generation: u64,
+    ) -> Result<TransferAction, Error> {
+        if device_id.is_empty() {
+            return Err(Error::invalid_argument("Missing target Connect device ID"));
+        }
+        let Some(roster) = self.connect_devices.borrow() else {
+            return Err(Error::unavailable("Connect devices are not ready"));
+        };
+        if roster.connection_generation != connection_generation {
+            return Err(Error::unavailable("Connect devices snapshot is stale"));
+        }
+        let Some(info) = roster.devices.get(device_id) else {
+            return Err(Error::not_found("Target Connect device not found"));
+        };
+        if !ConnectDevices::is_visible(info) {
+            return Err(Error::failed_precondition(
+                "Target Connect device is unavailable",
+            ));
+        }
+        let local_device_id = self.session.device_id();
+        if roster.active_device_id == device_id
+            && (device_id != local_device_id || self.connect_state.is_active())
+        {
+            return Ok(TransferAction::AlreadyActive);
+        }
+        if ConnectDevices::is_restricted(device_id, info, local_device_id) {
+            return Err(Error::permission_denied(
+                "Target Connect device is restricted",
+            ));
+        }
+        Ok(TransferAction::Transfer)
+    }
+
     async fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
         trace!("Received SpircCommand::{cmd:?}");
         match cmd {
@@ -967,19 +1270,15 @@ impl SpircTask {
             } => {
                 // Prefer already-received cluster updates over an older snapshot,
                 // even if select! happened to choose this command first.
-                while let Some(update) = self.connect_state_update.next().now_or_never() {
-                    match update {
-                        Some(Ok(update)) => {
-                            if let Err(error) = self.handle_cluster_update(update).await {
-                                let _ = reply.send(Err(error));
-                                return Ok(());
-                            }
-                        }
-                        _ => {
-                            self.record_remote_playback(None);
-                            let _ = reply.send(Ok(false));
-                            return Ok(());
-                        }
+                match self.drain_cluster_updates().await {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        let _ = reply.send(Ok(false));
+                        return Ok(());
+                    }
+                    Err(error) => {
+                        let _ = reply.send(Err(error));
+                        return Ok(());
                     }
                 }
                 let connection = self.session.dealer().connection_generation();
@@ -1011,6 +1310,62 @@ impl SpircTask {
                     }
                 })
                 .await;
+                return Ok(());
+            }
+            SpircCommand::TransferTo {
+                device_id,
+                guard,
+                reply,
+            } => {
+                match self.drain_cluster_updates().await {
+                    Ok(true) => {}
+                    Ok(false) => {
+                        let _ = reply.send(Err(Error::unavailable("Connect update stream closed")));
+                        return Ok(());
+                    }
+                    Err(error) => {
+                        let _ = reply.send(Err(error));
+                        return Ok(());
+                    }
+                }
+                let Some(connection_generation) = self.session.dealer().connection_generation()
+                else {
+                    let _ = reply.send(Err(Error::unavailable(
+                        "Connect connection is disconnected",
+                    )));
+                    return Ok(());
+                };
+                if reply.is_closed() || self.session.is_invalid() {
+                    let _ = reply.send(Err(Error::unavailable("Connect runtime was replaced")));
+                    return Ok(());
+                }
+                match self.validate_transfer_target(&device_id, connection_generation) {
+                    Err(error) => {
+                        let _ = reply.send(Err(error));
+                    }
+                    Ok(TransferAction::AlreadyActive) => {
+                        let result = if (guard.0)() {
+                            Ok(())
+                        } else {
+                            Err(Error::unavailable("Connect runtime was replaced"))
+                        };
+                        let _ = reply.send(result);
+                    }
+                    Ok(TransferAction::Transfer) => {
+                        let session = self.session.clone();
+                        tokio::spawn(async move {
+                            let result = execute_transfer_once(
+                                &session,
+                                connection_generation,
+                                &device_id,
+                                guard,
+                                &reply,
+                            )
+                            .await;
+                            let _ = reply.send(result);
+                        });
+                    }
+                }
                 return Ok(());
             }
             SpircCommand::Shutdown => {
@@ -1259,7 +1614,7 @@ impl SpircTask {
 
     async fn handle_connection_id_update(&mut self, connection_id: String) -> Result<(), Error> {
         trace!("Received connection ID update: {connection_id:?}");
-        self.remote_playback.send_replace(None);
+        self.record_cluster(None);
         self.connection_generation = self.session.dealer().connection_generation().unwrap_or(0);
         // The initial response below is authoritative for the new connection;
         // don't later restamp buffered updates from the previous socket as fresh.
@@ -1285,7 +1640,7 @@ impl SpircTask {
         }
         .ok_or(SpircError::FailedDealerSetup)?;
 
-        self.record_remote_playback(Some(&cluster));
+        self.record_cluster(Some(&cluster));
         debug!(
             "successfully put connect state for {} with connection-id {connection_id}",
             self.session.device_id()
@@ -1310,8 +1665,6 @@ impl SpircTask {
                 cluster.player_state.session_id
             )
         }
-
-        use protobuf::Message;
 
         match TransferState::parse_from_bytes(&cluster.transfer_data) {
             Ok(transfer_state) => self.handle_transfer(transfer_state)?,
@@ -1367,6 +1720,12 @@ impl SpircTask {
         }
     }
 
+    fn record_cluster(&mut self, cluster: Option<&Cluster>) {
+        self.record_remote_playback(cluster);
+        self.connect_devices
+            .record(self.connection_generation, cluster);
+    }
+
     fn record_remote_playback(&self, cluster: Option<&Cluster>) {
         self.remote_playback.send_replace(Some(RemotePlaybackSnapshot {
             connection_generation: self.connection_generation,
@@ -1389,7 +1748,7 @@ impl SpircTask {
         );
 
         if let Some(cluster) = cluster_update.cluster.take() {
-            self.record_remote_playback(Some(&cluster));
+            self.record_cluster(Some(&cluster));
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {
@@ -1403,7 +1762,7 @@ impl SpircTask {
                 self.update_state = true;
             }
         } else {
-            self.record_remote_playback(None);
+            self.record_cluster(None);
             if self.connect_state.is_active() {
                 self.connect_state.became_inactive(&self.session).await?;
             }
@@ -1689,9 +2048,15 @@ impl SpircTask {
         self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
             .update_position_in_relation(self.now_ms());
-        self.notify().await?;
+        self.send_notify_state().await?;
 
-        self.connect_state.became_inactive(&self.session).await?;
+        let bytes = self.connect_state.became_inactive(&self.session).await?;
+        if !bytes.is_empty()
+            && let Ok(cluster) = Cluster::parse_from_bytes(&bytes)
+            && (!cluster.device.is_empty() || !cluster.active_device_id.is_empty())
+        {
+            self.record_cluster(Some(&cluster));
+        }
 
         self.player
             .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
@@ -2372,7 +2737,7 @@ impl SpircTask {
         Ok(())
     }
 
-    async fn notify(&mut self) -> Result<(), Error> {
+    async fn send_notify_state(&mut self) -> Result<Option<Cluster>, Error> {
         self.prefetch_upcoming_tracks();
         self.connect_state.set_status(&self.play_status);
 
@@ -2383,10 +2748,20 @@ impl SpircTask {
 
         self.connect_state.set_now(self.now_ms() as u64);
 
-        self.connect_state
-            .send_state(&self.session)
-            .await
-            .map(|_| ())
+        let bytes = self.connect_state.send_state(&self.session).await?;
+        if bytes.is_empty() {
+            return Ok(None);
+        }
+        Ok(Cluster::parse_from_bytes(&bytes)
+            .ok()
+            .filter(|cluster| !cluster.device.is_empty() || !cluster.active_device_id.is_empty()))
+    }
+
+    async fn notify(&mut self) -> Result<(), Error> {
+        if let Some(cluster) = self.send_notify_state().await? {
+            self.record_cluster(Some(&cluster));
+        }
+        Ok(())
     }
 
     fn set_volume(&mut self, volume: u16) {
@@ -2412,5 +2787,136 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{core::error::ErrorKind, protocol::connect::Capabilities};
+
+    fn device(name: &str) -> DeviceInfo {
+        DeviceInfo {
+            name: name.into(),
+            can_play: true,
+            device_type: DeviceType::SPEAKER.into(),
+            capabilities: MessageField::some(Capabilities {
+                volume_steps: 64,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn cluster(active_device_id: &str, playing: bool, paused: bool) -> Cluster {
+        Cluster {
+            active_device_id: active_device_id.into(),
+            device: [("speaker".into(), device("Speaker"))].into(),
+            player_state: MessageField::some(PlayerState {
+                is_playing: playing,
+                is_paused: paused,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn connect_devices_visibility_and_restriction_match_connect_contract() {
+        let visible = device("Speaker");
+        assert!(ConnectDevices::is_visible(&visible));
+        assert!(!ConnectDevices::is_restricted("speaker", &visible, "local"));
+
+        let mut hidden = device("Hidden");
+        hidden.capabilities.mut_or_insert_default().hidden = true;
+        assert!(!ConnectDevices::is_visible(&hidden));
+
+        let mut offline = device("Offline");
+        offline.is_offline = true;
+        assert!(!ConnectDevices::is_visible(&offline));
+
+        let mut observer = device("Observer");
+        observer.device_type = DeviceType::OBSERVER.into();
+        assert!(!ConnectDevices::is_visible(&observer));
+
+        let mut local_only = device("LocalOnly");
+        local_only
+            .capabilities
+            .mut_or_insert_default()
+            .restrict_to_local = true;
+        assert!(!ConnectDevices::is_restricted(
+            "local",
+            &local_only,
+            "local"
+        ));
+        assert!(ConnectDevices::is_restricted(
+            "remote",
+            &local_only,
+            "local"
+        ));
+
+        let mut transfer_disallowed = device("Restricted");
+        transfer_disallowed
+            .disallow_transfer_reasons
+            .push("restricted".into());
+        assert!(ConnectDevices::is_restricted(
+            "remote",
+            &transfer_disallowed,
+            "local"
+        ));
+    }
+
+    #[test]
+    fn cluster_roster_tracks_ownership_away_and_back_and_disconnects() {
+        let (mut roster, rx) = ClusterRoster::new();
+        assert!(rx.borrow().is_none());
+
+        roster.record(1, Some(&cluster("speaker", true, false)));
+        let first = rx.borrow().clone().unwrap();
+        assert_eq!(first.active_device_id, "speaker");
+        assert!(first.is_playing);
+        assert_eq!(first.connection_generation, 1);
+        assert_eq!(first.ownership_generation, 1);
+
+        // Same owner with state update keeps ownership generation stable.
+        roster.record(1, Some(&cluster("speaker", true, true)));
+        let paused = rx.borrow().clone().unwrap();
+        assert!(!paused.is_playing);
+        assert_eq!(paused.ownership_generation, 1);
+
+        // Moving away and back must bump ownership generation even on the same connection.
+        roster.record(1, Some(&cluster("local", true, false)));
+        let away = rx.borrow().clone().unwrap();
+        assert_eq!(away.ownership_generation, 2);
+
+        roster.record(1, Some(&cluster("speaker", true, false)));
+        let back = rx.borrow().clone().unwrap();
+        assert_eq!(back.ownership_generation, 3);
+
+        roster.record(1, None);
+        assert!(rx.borrow().is_none());
+
+        roster.record(2, Some(&cluster("speaker", false, false)));
+        let reconnected = rx.borrow().clone().unwrap();
+        assert_eq!(reconnected.connection_generation, 2);
+        assert!(reconnected.ownership_generation > back.ownership_generation);
+    }
+
+    #[tokio::test]
+    async fn current_connect_devices_rejects_disconnected_and_stopped_runtimes() {
+        let session = Session::new(Default::default(), None);
+        let (mut roster, rx) = ClusterRoster::new();
+        roster.record(1, Some(&cluster("speaker", true, false)));
+
+        assert_eq!(
+            read_connect_devices(&rx, &session).unwrap_err().kind,
+            ErrorKind::Unavailable
+        );
+
+        session.shutdown();
+        assert_eq!(
+            read_connect_devices(&rx, &session).unwrap_err().kind,
+            ErrorKind::Unavailable
+        );
     }
 }
