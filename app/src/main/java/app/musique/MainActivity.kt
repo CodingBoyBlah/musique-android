@@ -571,11 +571,7 @@ class MainActivity : ComponentActivity() {
                                                             onDismiss = {
                                                                 miniPlayerViewModel.setAudio(null)
                                                             },
-                                                            modifier = Modifier.padding(
-                                                                horizontal = 12.dp,
-                                                                vertical = 12.dp
-                                                            ),
-                                                            showQueue = { sheetState.show() },
+                                                            sheetState = playerSheetState,
                                                             onClick = {
                                                                 scope.launch {
                                                                     Haptics.toggle(context, view)

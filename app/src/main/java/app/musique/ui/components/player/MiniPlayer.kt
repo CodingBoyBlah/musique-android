@@ -1,15 +1,27 @@
 package app.musique.ui.components.player
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,54 +29,50 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Cast
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.PartyMode
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PhoneIphone
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material3.ContainedLoadingIndicator
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialShapes
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.musique.ALBUM_COVER_URL
 import app.musique.R
@@ -73,21 +81,38 @@ import app.musique.core.model.getCover
 import app.musique.data.setting.LocalUiSettings
 import app.musique.ui.Haptics
 import app.musique.ui.components.SmartImage
+import app.musique.ui.theme.ArtworkPalette
+import app.musique.ui.theme.LocalNowPlayingPalette
+import app.musique.ui.theme.MusiqueColors
+import app.musique.ui.theme.MusiqueDimens
+import app.musique.ui.theme.MusiqueMotion
+import app.musique.ui.theme.MusiqueShapes
+import app.musique.ui.theme.MusiqueType
+import app.musique.ui.theme.pressScale
 import app.musique.ui.viewmodel.player.MiniPlayerViewModel
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.max
-import kotlin.math.roundToInt
+import kotlin.math.sin
 
-private val TAB_HEIGHT = 20.dp
+private enum class MiniDragAxis { None, Horizontal, VerticalUp, VerticalDown }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
+private const val HorizontalRubberBandFactor = 0.35f
+private const val VerticalDismissFollowFactor = 0.75f
+private val SkipSwipeThreshold = 72.dp
+private val DismissSwipeThreshold = 40.dp
+private val ExpandSwipeThreshold = 72.dp
+private val FlingVelocityThreshold = 450.dp
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun MiniPlayer(
     viewModel: MiniPlayerViewModel,
     onDismiss: () -> Unit,
-    showQueue: () -> Unit,
     modifier: Modifier = Modifier,
-    onExpand: (() -> Unit)? = null,
+    sheetState: PlayerSheetState? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -95,292 +120,582 @@ fun MiniPlayer(
     val currentAudio by viewModel.currentAudio.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState(initial = false)
     val isBuffering by viewModel.isBuffering().collectAsState(initial = false)
-    val isJamSession by viewModel.isJamSession.collectAsStateWithLifecycle()
-    val jamMemberCount by viewModel.jamMemberCount.collectAsStateWithLifecycle()
-    val isActiveDevice by viewModel.isActiveDevice().collectAsState(initial = true)
     val currentTime by viewModel.positionMs.collectAsStateWithLifecycle()
     val spirc = viewModel.spirc
 
     val totalTime = currentAudio?.duration ?: 0L
+    val progress = if (totalTime > 0L) (currentTime.toFloat() / totalTime).coerceIn(0f, 1f) else 0f
+    val artworkUrl = currentAudio?.getCover(CoverSize.SMALL)?.uri?.let { ALBUM_COVER_URL + it }
 
-    val imageSize = 44.dp
-    val artworkUrl =
-        currentAudio?.getCover(CoverSize.SMALL)?.uri?.let { ALBUM_COVER_URL + it }
+    val title = currentAudio?.name ?: stringResource(R.string.player_nothing_playing)
+    val subtitle = currentAudio?.artists?.joinToString { it.name }?.takeIf { it.isNotBlank() }
+        ?: currentAudio?.showName
+        ?: stringResource(R.string.player_unknown_source)
 
-    val offsetY = remember { Animatable(0f) }
     val coroutineScope = rememberCoroutineScope()
+    val dragOffsetX = remember { Animatable(0f) }
+    val dismissOffsetY = remember { Animatable(0f) }
+    val interactive by remember(sheetState) {
+        derivedStateOf { (sheetState?.progress ?: 0f) < 0.25f }
+    }
+
+    val latestOnClick by rememberUpdatedState(onClick)
+    val latestOnDismiss by rememberUpdatedState(onDismiss)
+
+    val cardInteractionSource = remember { MutableInteractionSource() }
+    val miniPlayerCd = stringResource(R.string.cd_mini_player)
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .clip(RoundedCornerShape(32.dp))
-            .pointerInput(Unit) {
-                var totalDragX = 0f
-                var totalDragY = 0f
+            .padding(horizontal = MusiqueDimens.miniPlayerSideMargin)
+            .pointerInput(sheetState, spirc) {
+                val skipThresholdPx = SkipSwipeThreshold.toPx()
+                val dismissThresholdPx = DismissSwipeThreshold.toPx()
+                val expandThresholdPx = ExpandSwipeThreshold.toPx()
+                val flingVelocityPx = FlingVelocityThreshold.toPx()
+                val fastHorizMinPx = 32.dp.toPx()
+                val fastDownMinPx = 20.dp.toPx()
+                val touchSlop = viewConfiguration.touchSlop
 
-                detectDragGestures(
-                    onDrag = { change, dragAmount ->
-                        totalDragX += dragAmount.x
-                        totalDragY += dragAmount.y
-
-                        coroutineScope.launch {
-                            val target = max(0f, offsetY.value + dragAmount.y)
-                            offsetY.snapTo(target)
-                        }
-                    },
-                    onDragEnd = {
-                        val horizontalThreshold = 100.dp.toPx()
-                        val verticalThreshold = 40.dp.toPx()
-
-                        when {
-                            totalDragX > horizontalThreshold -> {
-                                spirc.playerPrevious()
-                                Haptics.textHandleMove(context, view)
-                            }
-                            totalDragX < -horizontalThreshold -> {
-                                spirc.playerNext()
-                                Haptics.textHandleMove(context, view)
-                            }
-                        }
-
-                        if (totalDragY > verticalThreshold) {
-                            onDismiss()
-                            Haptics.confirm(context, view)
-                        } else {
-                            coroutineScope.launch {
-                                offsetY.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = tween(durationMillis = 300)
-                                )
-                            }
-                        }
-
-                        totalDragX = 0f
-                        totalDragY = 0f
-                    },
-                    onDragCancel = {
-                        coroutineScope.launch {
-                            offsetY.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(durationMillis = 300)
-                            )
-                        }
-                        totalDragX = 0f
-                        totalDragY = 0f
-                    }
-                )
-            }
-            .offset { IntOffset(x = 0, y = offsetY.value.roundToInt()) },
-        contentAlignment = Alignment.BottomCenter,
-    ) {
-        AnimatedVisibility(
-            visible = onExpand != null,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .wrapContentWidth()
-                .offset(y = -TAB_HEIGHT, x = (-55).dp)
-        ) {
-            Surface(
-                modifier = Modifier
-                    .height(TAB_HEIGHT)
-                    .clickable { onExpand?.invoke() },
-                shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
-                tonalElevation = 0.dp,
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ExpandLess,
-                        contentDescription = stringResource(R.string.common_expand),
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                awaitEachGesture {
+                    val down = awaitFirstDown(
+                        requireUnconsumed = false,
+                        pass = PointerEventPass.Initial,
                     )
-                }
-            }
-        }
+                    if ((sheetState?.progress ?: 0f) >= 0.25f) return@awaitEachGesture
 
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .clickable { onClick?.invoke() },
-            tonalElevation = 0.dp,
-            shadowElevation = 16.dp,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 6.dp, end = 10.dp)
-            ) {
-                // Album artwork
-                Box(
-                    modifier = Modifier
-                        .size(64.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier
-                            .size(imageSize)
-                    ) {
-                        SmartImage(
-                            url = artworkUrl,
-                            contentDescription = stringResource(R.string.common_artwork),
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            monochrome = LocalUiSettings.current.monochromePlayer
-                        )
+                    var activePointerId = down.id
+                    var axis = MiniDragAxis.None
+                    var totalDx = 0f
+                    var totalDy = 0f
+                    var rawDragX = dragOffsetX.value / HorizontalRubberBandFactor
+                    var rawDragY = 0f
+                    var prevLocalX = down.position.x
+                    // Add the sheet's current translation so upward drags track screen coordinates
+                    // cleanly without oscillating as PlayerSheet translates with rawOffset.
+                    fun currentSheetY(localY: Float): Float {
+                        val sheetOffset = sheetState?.draggableState?.offset?.takeIf { !it.isNaN() } ?: 0f
+                        return localY + sheetOffset
                     }
 
-                    if (isBuffering) {
-                        ContainedLoadingIndicator(
-                            modifier = Modifier
-                                .size(imageSize)
-                                .alpha(0.5f)
-                                .align(Alignment.Center),
-                        )
-                    }
-                }
+                    var prevSheetY = currentSheetY(down.position.y)
+                    var horizontalArmed = false
+                    var dismissArmed = false
+                    var releasedCleanly = false
+                    val velocityTracker = VelocityTracker()
+                    velocityTracker.addPosition(down.uptimeMillis, Offset(down.position.x, prevSheetY))
 
-                Column(
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = currentAudio?.name ?: stringResource(R.string.player_nothing_playing),
-                        style = MaterialTheme.typography.bodyLargeEmphasized,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    try {
+                        while (true) {
+                            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull { it.id == activePointerId }
+                                ?: event.changes.firstOrNull { it.pressed }
+                                ?: break
+                            activePointerId = change.id
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                            val sheetY = currentSheetY(change.position.y)
+                            val dx = change.position.x - prevLocalX
+                            val dy = sheetY - prevSheetY
+                            prevLocalX = change.position.x
+                            prevSheetY = sheetY
+                            velocityTracker.addPosition(change.uptimeMillis, Offset(change.position.x, sheetY))
 
-                    val subtitle = currentAudio?.artists?.joinToString { it.name }
-                        ?: currentAudio?.showName
-                        ?: stringResource(R.string.player_unknown_source)
-
-                    Text(
-                        text = buildString {
-                            append(subtitle)
-                            append(" · ")
-                            append(formatTime(currentTime))
-                            append(" / ")
-                            append(formatTime(totalTime))
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    MiniPlayerDeviceButton(
-                        isActiveDevice = isActiveDevice,
-                        isJamSession = isJamSession,
-                        onClick = viewModel::openDevices,
-                        memberCount = jamMemberCount,
-                    )
-
-                    IconButton(
-                        onClick = showQueue,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.QueueMusic,
-                            contentDescription = stringResource(R.string.common_see_queue),
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                        shape = MaterialShapes.Cookie4Sided.toShape(),
-                    ) {
-                        IconButton(onClick = {
-                            viewModel.setAudio(currentAudio)
-                            spirc.playerPlayPause()
-                            Haptics.textHandleMove(context, view)
-                        }) {
-                            if (isPlaying) {
-                                Icon(
-                                    imageVector = Icons.Default.Pause,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                            if (axis == MiniDragAxis.None) {
+                                totalDx += dx
+                                totalDy += dy
+                                if (hypot(totalDx, totalDy) > touchSlop) {
+                                    axis = when {
+                                        abs(totalDx) > abs(totalDy) -> MiniDragAxis.Horizontal
+                                        totalDy < 0f -> MiniDragAxis.VerticalUp
+                                        else -> MiniDragAxis.VerticalDown
+                                    }
+                                    change.consume()
+                                    when (axis) {
+                                        MiniDragAxis.Horizontal -> {
+                                            rawDragX += totalDx
+                                            coroutineScope.launch {
+                                                dragOffsetX.snapTo(rawDragX * HorizontalRubberBandFactor)
+                                            }
+                                            horizontalArmed = abs(rawDragX) >= skipThresholdPx
+                                            if (horizontalArmed) Haptics.swipeArm(context, view)
+                                        }
+                                        MiniDragAxis.VerticalDown -> {
+                                            rawDragY = max(0f, totalDy)
+                                            coroutineScope.launch {
+                                                dismissOffsetY.snapTo(rawDragY * VerticalDismissFollowFactor)
+                                            }
+                                            dismissArmed = rawDragY >= dismissThresholdPx
+                                            if (dismissArmed) Haptics.swipeArm(context, view)
+                                        }
+                                        MiniDragAxis.VerticalUp -> {
+                                            if (sheetState != null) {
+                                                sheetState.draggableState.dispatchRawDelta(totalDy)
+                                            } else {
+                                                rawDragY = totalDy
+                                            }
+                                        }
+                                        MiniDragAxis.None -> Unit
+                                    }
+                                }
                             } else {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
+                                change.consume()
+                                when (axis) {
+                                    MiniDragAxis.Horizontal -> {
+                                        rawDragX += dx
+                                        coroutineScope.launch {
+                                            dragOffsetX.snapTo(rawDragX * HorizontalRubberBandFactor)
+                                        }
+                                        val nowArmed = abs(rawDragX) >= skipThresholdPx
+                                        if (nowArmed && !horizontalArmed) {
+                                            Haptics.swipeArm(context, view)
+                                        }
+                                        horizontalArmed = nowArmed
+                                    }
+                                    MiniDragAxis.VerticalDown -> {
+                                        rawDragY = max(0f, rawDragY + dy)
+                                        coroutineScope.launch {
+                                            dismissOffsetY.snapTo(rawDragY * VerticalDismissFollowFactor)
+                                        }
+                                        val nowArmed = rawDragY >= dismissThresholdPx
+                                        if (nowArmed && !dismissArmed) {
+                                            Haptics.swipeArm(context, view)
+                                        }
+                                        dismissArmed = nowArmed
+                                    }
+                                    MiniDragAxis.VerticalUp -> {
+                                        if (sheetState != null) {
+                                            sheetState.draggableState.dispatchRawDelta(dy)
+                                        } else {
+                                            rawDragY += dy
+                                        }
+                                    }
+                                    MiniDragAxis.None -> Unit
+                                }
+                            }
+
+                            if (change.changedToUpIgnoreConsumed() && event.changes.none { it.pressed }) {
+                                releasedCleanly = true
+                                break
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun MiniPlayerDeviceButton(
-    isActiveDevice: Boolean,
-    isJamSession: Boolean,
-    memberCount: Number,
-    onClick: () -> Unit,
-) {
-    val jamStatus = stringResource(if (isJamSession) R.string.jam_active else R.string.jam_not_in_jam)
-
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(36.dp).semantics { stateDescription = jamStatus },
-    ) {
-        BadgedBox(
-            badge = {
-                if (isJamSession) {
-                    Badge(
-                        containerColor = MaterialTheme.colorScheme.tertiary,
-                        contentColor = MaterialTheme.colorScheme.onTertiary,
-                    ) {
-                        Text(
-                            text = "$memberCount",
-                            fontSize = 12.sp
-                        )
+                    } finally {
+                        val velocity = velocityTracker.calculateVelocity()
+                        when (axis) {
+                            MiniDragAxis.Horizontal -> {
+                                if (releasedCleanly) {
+                                    val fastLeft = velocity.x < -flingVelocityPx && rawDragX < -fastHorizMinPx
+                                    val fastRight = velocity.x > flingVelocityPx && rawDragX > fastHorizMinPx
+                                    when {
+                                        rawDragX <= -skipThresholdPx || fastLeft -> {
+                                            if (!horizontalArmed) Haptics.swipeArm(context, view)
+                                            spirc.playerNext()
+                                        }
+                                        rawDragX >= skipThresholdPx || fastRight -> {
+                                            if (!horizontalArmed) Haptics.swipeArm(context, view)
+                                            spirc.playerPrevious()
+                                        }
+                                    }
+                                }
+                                coroutineScope.launch {
+                                    dragOffsetX.animateTo(0f, animationSpec = MusiqueMotion.press())
+                                }
+                            }
+                            MiniDragAxis.VerticalDown -> {
+                                val fastDown = velocity.y > flingVelocityPx && rawDragY > fastDownMinPx
+                                if (releasedCleanly && (rawDragY >= dismissThresholdPx || fastDown)) {
+                                    Haptics.confirm(context, view)
+                                    latestOnDismiss()
+                                } else {
+                                    coroutineScope.launch {
+                                        dismissOffsetY.animateTo(0f, animationSpec = MusiqueMotion.press())
+                                    }
+                                }
+                            }
+                            MiniDragAxis.VerticalUp -> {
+                                if (sheetState != null) {
+                                    val collapsed = sheetState.draggableState.anchors.positionOf(PlayerSheetValue.Collapsed)
+                                    val offset = sheetState.draggableState.offset.takeIf { !it.isNaN() } ?: collapsed
+                                    val draggedUp = (collapsed - offset).coerceAtLeast(0f)
+                                    val expand = releasedCleanly && when {
+                                        velocity.y < -flingVelocityPx -> true
+                                        velocity.y > flingVelocityPx -> false
+                                        else -> draggedUp > expandThresholdPx || sheetState.progress > 0.25f
+                                    }
+                                    coroutineScope.launch {
+                                        sheetState.draggableState.animateTo(
+                                            targetValue = if (expand) PlayerSheetValue.Expanded else PlayerSheetValue.Collapsed,
+                                            animationSpec = MusiqueMotion.sheet(),
+                                        )
+                                    }
+                                } else if (releasedCleanly && (rawDragY < -dismissThresholdPx || velocity.y < -flingVelocityPx)) {
+                                    latestOnClick?.invoke()
+                                }
+                            }
+                            MiniDragAxis.None -> Unit
+                        }
                     }
                 }
             },
+    ) {
+        MiniPlayerCard(
+            artworkUrl = artworkUrl,
+            title = title,
+            subtitle = subtitle,
+            trackKey = currentAudio?.uri,
+            progress = progress,
+            isPlaying = isPlaying,
+            isBuffering = isBuffering,
+            monochromeArtwork = LocalUiSettings.current.monochromePlayer,
+            interactive = interactive,
+            cardInteractionSource = cardInteractionSource,
+            onCardClick = { latestOnClick?.invoke() },
+            onPlayPause = {
+                viewModel.setAudio(currentAudio)
+                spirc.playerPlayPause()
+                Haptics.toggle(context, view)
+            },
+            onNext = {
+                spirc.playerNext()
+                Haptics.textHandleMove(context, view)
+            },
+            modifier = Modifier
+                .graphicsLayer {
+                    translationX = dragOffsetX.value
+                    translationY = dismissOffsetY.value
+                    val dismissRangePx = DismissSwipeThreshold.toPx().coerceAtLeast(1f)
+                    alpha = (1f - (dismissOffsetY.value / dismissRangePx) * 0.28f).coerceIn(0.6f, 1f)
+                }
+                .semantics { contentDescription = miniPlayerCd },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+@Composable
+private fun MiniPlayerCard(
+    artworkUrl: String?,
+    title: String,
+    subtitle: String,
+    trackKey: String?,
+    progress: Float,
+    isPlaying: Boolean,
+    isBuffering: Boolean,
+    monochromeArtwork: Boolean,
+    interactive: Boolean,
+    cardInteractionSource: MutableInteractionSource,
+    onCardClick: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalNowPlayingPalette.current
+    val playInteractionSource = remember { MutableInteractionSource() }
+    val nextInteractionSource = remember { MutableInteractionSource() }
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(MusiqueDimens.miniPlayerHeight)
+            .pressScale(cardInteractionSource, pressedScale = 0.985f)
+            .clickable(
+                enabled = interactive,
+                interactionSource = cardInteractionSource,
+                indication = null,
+                role = Role.Button,
+                onClick = onCardClick,
+            ),
+        shape = MusiqueShapes.miniPlayer,
+        color = palette.surface,
+        border = BorderStroke(1.dp, MusiqueColors.hairline),
+        tonalElevation = 0.dp,
+        shadowElevation = 12.dp,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 9.dp, end = 6.dp),
         ) {
-            Icon(
-                if (isActiveDevice) Icons.Default.PhoneIphone else Icons.Default.Cast,
-                contentDescription = stringResource(R.string.cd_devices),
-                modifier = Modifier.size(20.dp),
-                tint = if (isJamSession) MaterialTheme.colorScheme.tertiary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Box(
+                modifier = Modifier.size(44.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                SmartImage(
+                    url = artworkUrl,
+                    contentDescription = stringResource(R.string.common_artwork),
+                    shape = MusiqueShapes.artworkMini,
+                    monochrome = monochromeArtwork,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (isBuffering) {
+                    ContainedLoadingIndicator(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .alpha(0.65f),
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MusiqueType.miniTitle,
+                    color = MusiqueColors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.then(
+                        if (isPlaying) {
+                            Modifier.basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                initialDelayMillis = 2_000,
+                            )
+                        } else {
+                            Modifier
+                        }
+                    ),
+                )
+
+                Text(
+                    text = subtitle,
+                    style = MusiqueType.miniSubtitle,
+                    color = MusiqueColors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+
+                Spacer(modifier = Modifier.height(3.dp))
+
+                MiniInlineProgressBar(
+                    progress = progress,
+                    isPlaying = isPlaying,
+                    trackKey = trackKey,
+                    activeColor = palette.accent,
+                    inactiveColor = MusiqueColors.trackInactive,
+                )
+            }
+
+            Surface(
+                modifier = Modifier
+                    .size(width = 56.dp, height = 44.dp)
+                    .pressScale(playInteractionSource)
+                    .clickable(
+                        enabled = interactive,
+                        interactionSource = playInteractionSource,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = onPlayPause,
+                    ),
+                shape = MusiqueShapes.miniPlayerPlayButton,
+                color = palette.accent,
+                contentColor = palette.onAccent,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    AnimatedContent(
+                        targetState = isPlaying,
+                        transitionSpec = {
+                            (scaleIn(animationSpec = MusiqueMotion.press()) + fadeIn()) togetherWith
+                                (scaleOut() + fadeOut())
+                        },
+                        label = "miniPlayPauseIcon",
+                    ) { playing ->
+                        Icon(
+                            imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = stringResource(
+                                if (playing) R.string.common_pause else R.string.common_play
+                            ),
+                            tint = palette.onAccent,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(2.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(width = 40.dp, height = 44.dp)
+                    .pressScale(nextInteractionSource)
+                    .clickable(
+                        enabled = interactive,
+                        interactionSource = nextInteractionSource,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = onNext,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.SkipNext,
+                    contentDescription = stringResource(R.string.common_next),
+                    tint = MusiqueColors.textPrimary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 }
 
-private fun formatTime(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0L)
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return "%01d:%02d".format(minutes, seconds)
+/**
+ * Non-draggable inline progress indicator under the MiniPlayer text. Shows an animated sine wave
+ * while playing and flattens smoothly into a straight line when paused.
+ */
+@Composable
+private fun MiniInlineProgressBar(
+    progress: Float,
+    isPlaying: Boolean,
+    trackKey: String?,
+    activeColor: Color,
+    inactiveColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val clampedProgress = progress.coerceIn(0f, 1f)
+    val animatedProgress = remember(trackKey) { Animatable(clampedProgress) }
+    LaunchedEffect(trackKey, clampedProgress) {
+        if (abs(clampedProgress - animatedProgress.value) > 0.2f) {
+            animatedProgress.snapTo(clampedProgress)
+        } else {
+            animatedProgress.animateTo(
+                targetValue = clampedProgress,
+                animationSpec = tween(durationMillis = 240, easing = LinearEasing),
+            )
+        }
+    }
+
+    val waveAmplitude by animateDpAsState(
+        targetValue = if (isPlaying) 1.5.dp else 0.dp,
+        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+        label = "miniWaveAmplitude",
+    )
+
+    val phaseShift = remember { Animatable(0f) }
+    LaunchedEffect(isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
+        val fullCycle = (2.0 * PI).toFloat()
+        while (true) {
+            val start = (phaseShift.value % fullCycle).let { if (it < 0f) it + fullCycle else it }
+            phaseShift.snapTo(start)
+            phaseShift.animateTo(
+                targetValue = start + fullCycle,
+                animationSpec = tween(durationMillis = 1_600, easing = LinearEasing),
+            )
+        }
+    }
+
+    val wavePath = remember { Path() }
+    val progressLabel = stringResource(R.string.cd_mini_player_progress)
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .semantics { contentDescription = progressLabel },
+    ) {
+        val strokePx = 2.dp.toPx()
+        val endCapRadius = 1.5.dp.toPx()
+        val startX = strokePx / 2f
+        val endX = (size.width - endCapRadius).coerceAtLeast(startX)
+        val usableWidth = (endX - startX).coerceAtLeast(0f)
+        val centerY = size.height / 2f
+        val progressX = startX + usableWidth * animatedProgress.value.coerceIn(0f, 1f)
+
+        if (progressX < endX) {
+            drawLine(
+                color = inactiveColor,
+                start = Offset(progressX, centerY),
+                end = Offset(endX, centerY),
+                strokeWidth = strokePx,
+                cap = StrokeCap.Round,
+            )
+        }
+        drawCircle(
+            color = inactiveColor,
+            radius = endCapRadius,
+            center = Offset(endX, centerY),
+        )
+
+        if (progressX > startX) {
+            val amplitudePx = waveAmplitude.toPx()
+            val waveLengthPx = 20.dp.toPx()
+            if (amplitudePx > 0.1f && waveLengthPx > 0f) {
+                val freq = ((2.0 * PI) / waveLengthPx).toFloat()
+                val step = 1.5.dp.toPx().coerceAtLeast(1.5f)
+                val phase = phaseShift.value
+
+                wavePath.reset()
+                var prevX = startX
+                var prevY = centerY + amplitudePx * sin(freq * prevX + phase)
+                wavePath.moveTo(prevX, prevY)
+
+                var x = prevX + step
+                while (x < progressX) {
+                    val y = centerY + amplitudePx * sin(freq * x + phase)
+                    wavePath.quadraticTo(prevX, prevY, (prevX + x) * 0.5f, (prevY + y) * 0.5f)
+                    prevX = x
+                    prevY = y
+                    x += step
+                }
+                val finalY = centerY + amplitudePx * sin(freq * progressX + phase)
+                wavePath.quadraticTo(prevX, prevY, progressX, finalY)
+
+                drawPath(
+                    path = wavePath,
+                    color = activeColor,
+                    style = Stroke(
+                        width = strokePx,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round,
+                    ),
+                )
+            } else {
+                drawLine(
+                    color = activeColor,
+                    start = Offset(startX, centerY),
+                    end = Offset(progressX, centerY),
+                    strokeWidth = strokePx,
+                    cap = StrokeCap.Round,
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+private fun MiniPlayerPreview() {
+    CompositionLocalProvider(
+        LocalNowPlayingPalette provides ArtworkPalette.Default.copy(
+            surface = Color(0xFF464039),
+            accent = Color(0xFFEED8C4),
+            onAccent = Color(0xFF221B15),
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .background(MusiqueColors.canvas)
+                .padding(vertical = 16.dp),
+        ) {
+            MiniPlayerCard(
+                artworkUrl = null,
+                title = "blue eyes",
+                subtitle = "Nohidea",
+                trackKey = "preview",
+                progress = 0.62f,
+                isPlaying = true,
+                isBuffering = false,
+                monochromeArtwork = false,
+                interactive = true,
+                cardInteractionSource = remember { MutableInteractionSource() },
+                onCardClick = {},
+                onPlayPause = {},
+                onNext = {},
+                modifier = Modifier.padding(horizontal = MusiqueDimens.miniPlayerSideMargin),
+            )
+        }
+    }
 }
