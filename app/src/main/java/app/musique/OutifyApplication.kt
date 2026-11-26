@@ -4,7 +4,7 @@ import android.app.Application
 import android.system.Os
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.ui.unit.dp
+import app.musique.ui.theme.MusiqueDimens
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.media3.common.util.UnstableApi
@@ -30,19 +30,19 @@ import javax.inject.Inject
 
 const val ALBUM_COVER_URL: String = "https://i.scdn.co/image/"
 
-val ScreenBottomPadding = 160.dp;
+/**
+ * Bottom padding a scrolling page adds after its last item so it clears the floating mini player
+ * and tab bar (plus a typical gesture inset). Derived from [MusiqueDimens], keep it that way.
+ */
+val ScreenBottomPadding = MusiqueDimens.floatingChromeHeight + MusiqueDimens.navInsetAllowance
 
 /**
- * How far a floating button has to sit from the bottom edge to clear what is
- * already drawn there.
- *
- * With the mini player showing, the stack from the bottom is its 68dp collapsed
- * inset plus its 88dp height, and 12dp of breathing room above that. At 160dp a
- * 56dp button landed on the mini player's top edge, which is the overlap reported
- * in #11.
+ * How far a floating button has to sit from the bottom edge to clear the floating chrome:
+ * the mini player stacked on the tab bar while something plays, otherwise just the tab bar.
  */
 fun fabBottomPadding(isMediaPlaying: Boolean) =
-    if (isMediaPlaying) 168.dp else 60.dp
+    (if (isMediaPlaying) MusiqueDimens.fabBottomWithMiniPlayer else MusiqueDimens.fabBottomWithoutMiniPlayer) +
+        MusiqueDimens.navInsetAllowance
 
 fun widgetMediaPreference(id: GlanceId) =
     stringPreferencesKey("widget_media_$id")

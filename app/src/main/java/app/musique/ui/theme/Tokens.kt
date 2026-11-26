@@ -83,4 +83,13 @@ object MusiqueDimens {
      * mini player and tab bar (add the navigation bar inset on top of this).
      */
     val floatingChromeHeight = miniPlayerTotalHeight + 16.dp
+
+    /**
+     * Stand-in for the gesture navigation inset where a fixed value is needed (screen bottom
+     * padding constants). The shell itself measures the real inset.
+     */
+    val navInsetAllowance = 24.dp
+
+    /** Gap between a toast and the floating chrome below it. */
+    val notificationGap = 8.dp
 }
